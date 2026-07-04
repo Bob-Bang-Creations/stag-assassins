@@ -1,8 +1,33 @@
+import { useState } from 'react'
+import { startGame } from '../game'
 import { JOIN_CODE, ROSTER } from '../gameConfig'
 
 export default function LobbyScreen({ me, players }) {
+  const [error, setError] = useState(null)
+  const [busy, setBusy] = useState(false)
+
   const joinedNames = new Set(players.map((p) => p.name))
   const missing = ROSTER.filter((name) => !joinedNames.has(name))
+
+  async function handleStart() {
+    if (
+      missing.length > 0 &&
+      !window.confirm(
+        `Only ${players.length} of ${ROSTER.length} are in (missing: ${missing.join(', ')}). Start without them?`,
+      )
+    ) {
+      return
+    }
+    setError(null)
+    setBusy(true)
+    try {
+      await startGame({ players })
+      // The game doc snapshot flips every phone to the active screen.
+    } catch (err) {
+      setError(err.message)
+      setBusy(false)
+    }
+  }
 
   return (
     <div className="screen">
@@ -39,18 +64,18 @@ export default function LobbyScreen({ me, players }) {
               ? 'All agents present.'
               : `Still waiting on ${missing.join(', ')}.`}
           </p>
+          {error && <p className="error mono">{error}</p>}
           <button
             type="button"
             className="primary-btn"
-            onClick={() =>
-              alert('The ring shuffle lands in the next build stage.')
-            }
+            disabled={busy}
+            onClick={handleStart}
           >
-            START THE GAME
+            {busy ? 'DEALING MISSIONS…' : 'START THE GAME'}
           </button>
           <p className="hint mono dim">
-            Starting deals every agent a target, an object and a location. No
-            going back.
+            Starting shuffles everyone into one ring and deals each agent a
+            target, an object and a location. No going back.
           </p>
         </section>
       ) : (

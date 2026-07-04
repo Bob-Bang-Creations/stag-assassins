@@ -11,14 +11,14 @@ function devPreview() {
   if (!import.meta.env.DEV) return null
   const which = new URLSearchParams(window.location.search).get('preview')
   if (!which) return null
-  const fakePlayers = ['Bob', 'Dave', 'Jonty', 'Steve'].map((name, i) => ({
+  const fakePlayers = ['Bob', 'Alex', 'Liam', 'Matt'].map((name, i) => ({
     id: `fake-${i}`,
     name,
     status: 'alive',
     kills: 0,
     isGM: name === 'Bob',
   }))
-  const fakeGame = { status: 'lobby', joinCode: 'STAG18' }
+  const fakeGame = { status: 'lobby', joinCode: 'STAG18', playerCount: 4 }
   if (which === 'join') {
     return <JoinScreen uid="preview" game={fakeGame} players={fakePlayers} />
   }
@@ -32,18 +32,25 @@ function devPreview() {
       />
     )
   }
+  if (which === 'active') {
+    return <ActivePlaceholder />
+  }
   return null
 }
 
 export default function App() {
   const [uid, setUid] = useState(null)
+  const [authError, setAuthError] = useState(null)
   const [game, setGame] = useState(undefined) // undefined = loading, null = no doc yet
   const [me, setMe] = useState(undefined)
   const [players, setPlayers] = useState([])
 
   useEffect(() => {
     if (!isConfigured) return undefined
-    return ensureSignedIn((user) => setUid(user.uid))
+    return ensureSignedIn(
+      (user) => setUid(user.uid),
+      (err) => setAuthError(err),
+    )
   }, [])
 
   useEffect(() => {
@@ -69,11 +76,56 @@ export default function App() {
   if (preview) return preview
 
   if (!isConfigured) return <SetupNotice />
+  if (authError) return <AuthErrorScreen error={authError} />
   if (!uid || me === undefined || game === undefined) return <LoadingScreen />
-  if (!me) return <JoinScreen uid={uid} game={game} players={players} />
 
-  // Later stages route on game.status ("active", "finished") and me.status.
-  return <LobbyScreen uid={uid} me={me} game={game} players={players} />
+  let screen
+  if (!me) {
+    screen = <JoinScreen uid={uid} game={game} players={players} />
+  } else if (game?.status === 'active') {
+    // Stage 3 replaces this with the mission card (and dead view later).
+    screen = <ActivePlaceholder />
+  } else {
+    screen = <LobbyScreen uid={uid} me={me} game={game} players={players} />
+  }
+
+  return (
+    <>
+      <OfflineBanner />
+      {screen}
+    </>
+  )
+}
+
+// The Firestore SDK retries quietly; this banner is so people blame the
+// signal, not the app, and don't force-refresh mid-action.
+function OfflineBanner() {
+  const [online, setOnline] = useState(navigator.onLine)
+  useEffect(() => {
+    const up = () => setOnline(true)
+    const down = () => setOnline(false)
+    window.addEventListener('online', up)
+    window.addEventListener('offline', down)
+    return () => {
+      window.removeEventListener('online', up)
+      window.removeEventListener('offline', down)
+    }
+  }, [])
+  if (online) return null
+  return (
+    <div className="offline-banner mono" role="status">
+      NO SIGNAL — reconnecting. Don't refresh; hold your position.
+    </div>
+  )
+}
+
+function ActivePlaceholder() {
+  return (
+    <div className="screen centered">
+      <h1 className="stamp">THE GAME IS AFOOT</h1>
+      <p className="mono dim">Your mission card arrives in the next build stage.</p>
+    </div>
+  )
 }
 
 function SetupNotice() {
@@ -87,6 +139,30 @@ function SetupNotice() {
           config into <code>src/firebaseConfig.js</code>. See README.md for the
           step-by-step.
         </p>
+      </div>
+    </div>
+  )
+}
+
+function AuthErrorScreen({ error }) {
+  return (
+    <div className="screen centered">
+      <h1 className="stamp">STAG ASSASSINS</h1>
+      <div className="dossier-card">
+        <p className="error mono">
+          Couldn't establish a secure channel: {error.message}
+        </p>
+        <p className="mono dim">
+          Usually this means Anonymous Auth isn't enabled in the Firebase
+          console, or there's no signal.
+        </p>
+        <button
+          type="button"
+          className="primary-btn"
+          onClick={() => window.location.reload()}
+        >
+          RETRY
+        </button>
       </div>
     </div>
   )

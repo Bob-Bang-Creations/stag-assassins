@@ -2,20 +2,36 @@ rules_version = '2';
 
 // Paste into Firebase console → Firestore → Rules (or `firebase deploy --only firestore:rules`).
 //
-// Threat model: 11 mates on a stag do. Anonymous Auth keeps randoms on the
-// internet out entirely. Mission secrets (target, object, location) live in
-// each player's private/mission doc, readable only by that player and the GM
-// — that stops the technical snoop. The 4-digit PIN in the app stops the
-// drunken one grabbing an unlocked phone. Writes are open to any signed-in
-// player because the kill handshake is a victim-driven transaction that has
-// to update the assassin's docs too.
+// Threat model: 11 mates on a stag do, plus whoever finds the hosted URL on
+// a printed QR card. Layers:
+//   - The join code (also checked in rules, not just the client) stops
+//     drive-by writes from anyone who merely loads the page.
+//   - Mission secrets and PINs live in each player's private/ subcollection,
+//     readable only by that player and the GM — stops the technical snoop.
+//   - gmUid is set once, only to yourself, and never changed, so the GM role
+//     (and its read-everything power) cannot be seized from the console.
+//   - The 4-digit PIN in the app stops the drunken mate grabbing an unlocked
+//     phone.
+// Writes between players stay open where the kill handshake needs them: it
+// is a victim-driven transaction that must update the assassin's docs too.
 
 service cloud.firestore {
   match /databases/{database}/documents {
     match /games/{gameId} {
 
+      // KEEP IN SYNC with JOIN_CODE in src/gameConfig.js. Not a secret —
+      // it's on the QR card — but it gates writes to people at the party.
+      function codeOk(data) {
+        return data.joinCode == 'STAG18';
+      }
+
       function signedIn() {
         return request.auth != null;
+      }
+
+      function isPlayer() {
+        return signedIn()
+          && exists(/databases/$(database)/documents/games/$(gameId)/players/$(request.auth.uid));
       }
 
       function isGM() {
@@ -23,26 +39,62 @@ service cloud.firestore {
           && get(/databases/$(database)/documents/games/$(gameId)).data.gmUid == request.auth.uid;
       }
 
-      allow read, write: if signedIn();
+      // gmUid unlocks every mission doc, so: absent, or set to yourself,
+      // or already set and unchanged. Never reassigned, never cleared.
+      function gmClaimOk() {
+        return !('gmUid' in request.resource.data)
+          || request.resource.data.gmUid == request.auth.uid;
+      }
+      function gmUnchanged() {
+        return !('gmUid' in request.resource.data)
+          || (('gmUid' in resource.data)
+              ? request.resource.data.gmUid == resource.data.gmUid
+              : request.resource.data.gmUid == request.auth.uid);
+      }
+
+      allow read: if signedIn();
+      allow create: if signedIn() && codeOk(request.resource.data) && gmClaimOk();
+      allow update: if signedIn() && codeOk(request.resource.data) && gmUnchanged();
+      allow delete: if false;
 
       match /players/{playerId} {
-        allow read, write: if signedIn();
+        allow read: if signedIn();
+        // Join: only as yourself, only with the code. GM can create docs
+        // for the re-link recovery tool.
+        allow create: if (signedIn() && playerId == request.auth.uid
+                          && codeOk(request.resource.data))
+                       || isGM();
+        // Any joined player may update any player doc — the kill handshake
+        // (victim-driven) updates the assassin's doc too.
+        allow update: if isPlayer() || isGM();
+        allow delete: if isGM();
 
-        // Mission secrets: owner and GM only.
+        // Mission secrets (target, object, location) and PIN.
         match /private/{docId} {
           allow read: if signedIn() && (request.auth.uid == playerId || isGM());
-          allow write: if signedIn();
+          // Own docs are writable during join (before the player doc
+          // exists); otherwise joined players (kill handshake writes the
+          // assassin's next mission) and the GM.
+          allow write: if (signedIn() && request.auth.uid == playerId)
+                        || isPlayer() || isGM();
         }
       }
 
-      // Name claims — the lock that prevents two phones taking one roster name.
+      // Name claims: the lock that stops two phones taking one roster name.
+      // Create-only as yourself; moving a name to a new phone is a GM
+      // recovery tool.
       match /names/{name} {
-        allow read, write: if signedIn();
+        allow read: if signedIn();
+        allow create: if signedIn()
+          && request.resource.data.uid == request.auth.uid
+          && codeOk(request.resource.data);
+        allow update, delete: if isGM();
       }
 
-      // Public kill feed. Append-only from clients.
+      // Public kill feed. Append-only, joined players only.
       match /events/{eventId} {
-        allow read, create: if signedIn();
+        allow read: if signedIn();
+        allow create: if isPlayer();
       }
     }
   }

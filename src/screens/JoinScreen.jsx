@@ -2,16 +2,35 @@ import { useState } from 'react'
 import { joinGame } from '../game'
 import { ROSTER } from '../gameConfig'
 
-export default function JoinScreen({ uid, players }) {
+export default function JoinScreen({ uid, game, players }) {
   const [code, setCode] = useState('')
   const [name, setName] = useState(null)
   const [pin, setPin] = useState('')
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
 
+  // The game started without you — don't let people fill in the whole form
+  // before finding out.
+  if (game && game.status !== 'lobby') {
+    return (
+      <div className="screen centered">
+        <h1 className="stamp">STAG ASSASSINS</h1>
+        <div className="dossier-card">
+          <p className="mono">
+            The game has already started — too late to join from here. Find
+            the Game Master.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   const takenNames = new Set(players.map((p) => p.name))
+  // Someone else can claim the selected name while this user types their
+  // PIN; the live snapshot catches it before submit.
+  const nameTaken = name !== null && takenNames.has(name)
   const pinValid = /^\d{4}$/.test(pin)
-  const ready = code.trim() !== '' && name !== null && pinValid && !busy
+  const ready = code.trim() !== '' && name !== null && !nameTaken && pinValid && !busy
 
   async function handleJoin() {
     setError(null)
@@ -63,18 +82,26 @@ export default function JoinScreen({ uid, players }) {
             )
           })}
         </div>
+        {nameTaken && (
+          <p className="error mono">
+            {name} just got claimed on another phone. If that's you, talk to
+            the Game Master.
+          </p>
+        )}
 
         <label className="field-label" htmlFor="pin">
           SET A 4-DIGIT PIN
         </label>
+        {/* text + inputMode, not type=password: iOS pushes keychain UI onto
+            password fields. Masking is done in CSS (pin-mask). */}
         <input
           id="pin"
-          className="big-input mono"
-          type="password"
+          className="big-input mono pin-mask"
+          type="text"
           inputMode="numeric"
           maxLength={4}
-          autoComplete="off"
-          placeholder="••••"
+          autoComplete="one-time-code"
+          placeholder="0000"
           value={pin}
           onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
         />

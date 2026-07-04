@@ -254,6 +254,27 @@ button {
   font-size: 18px;
 }
 
+/* PIN masking without type=password (which triggers iOS keychain UI) */
+
+.pin-mask {
+  -webkit-text-security: disc;
+  letter-spacing: 0.4em;
+}
+
+/* Offline banner */
+
+.offline-banner {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--accent);
+  color: #fff;
+  text-align: center;
+  padding: 10px 12px;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;

@@ -44,12 +44,28 @@ profiles or private windows (each gets its own anonymous identity — but warn
 the real group **not** to use private browsing on the night, it resets their
 identity on close).
 
+## Security model (short version)
+
+- The join code is enforced in `firestore.rules`, not just the client — a
+  stranger who finds the URL can read the feed but can't write anything.
+  If you change `JOIN_CODE` in `src/gameConfig.js`, update `codeOk()` in
+  `firestore.rules` and republish.
+- Mission secrets and PINs live in each player's `private/` subcollection,
+  readable only by that player and the GM.
+- The GM role (`gmUid` on the game doc) can be set once, only to yourself,
+  never changed — it can't be seized from a browser console.
+- Transactions (join, start, kill handshake) need signal; plain reads and
+  the feed keep working offline. The app shows a NO SIGNAL banner.
+- If someone switches phones or clears their browser data, their name stays
+  claimed by the old identity — the GM re-link tool (GM panel stage) is the
+  recovery path.
+
 ## Build stages
 
 Implemented in order, per the development plan:
 
 1. ✅ Join and lobby
-2. ⬜ Ring shuffle on start
+2. ✅ Ring shuffle on start
 3. ⬜ Mission card
 4. ⬜ Kill handshake transaction
 5. ⬜ Kill feed
