@@ -9,6 +9,7 @@ import {
   addDoc,
   collection,
   doc,
+  getDoc,
   runTransaction,
   serverTimestamp,
 } from 'firebase/firestore'
@@ -67,9 +68,13 @@ export async function joinGame({ uid, name, pin, code }) {
     }
     const gameSnap = await tx.get(gameRef())
     const rejoining = nameSnap.exists() // same uid re-claiming its own name
+    // Exactly ONE write to the game doc per transaction: rules evaluate each
+    // write against pre-transaction state, so a second same-doc write would
+    // be judged as a create with only its own fields and fail codeOk.
     if (!gameSnap.exists()) {
       // First player in creates the game doc in lobby state. playerCount
-      // lets the start transaction detect a join racing the shuffle.
+      // lets the start transaction detect a join racing the shuffle. gmUid
+      // (set once, to yourself only) powers the GM-read rule on missions.
       tx.set(gameRef(), {
         status: 'lobby',
         joinCode: JOIN_CODE,
@@ -77,17 +82,28 @@ export async function joinGame({ uid, name, pin, code }) {
         winnerId: null,
         playerCount: 1,
         createdAt: serverTimestamp(),
+        ...(name === GM_NAME ? { gmUid: uid } : {}),
       })
     } else if (gameSnap.data().status !== 'lobby') {
       throw new Error('The game has already started. Too late to join.')
-    } else if (!rejoining) {
-      tx.set(
-        gameRef(),
-        { playerCount: (gameSnap.data().playerCount ?? 0) + 1 },
-        { merge: true },
-      )
+    } else {
+      const patch = {}
+      if (!rejoining) {
+        patch.playerCount = (gameSnap.data().playerCount ?? 0) + 1
+      }
+      if (name === GM_NAME && !gameSnap.data().gmUid) {
+        patch.gmUid = uid
+      }
+      if (Object.keys(patch).length > 0) {
+        tx.set(gameRef(), patch, { merge: true })
+      }
     }
-    tx.set(nameRef(name), { uid, joinCode: JOIN_CODE })
+    // Only create the claim when absent: overwriting an existing claim is
+    // an UPDATE, which rules reserve for the GM (re-link recovery tool) —
+    // and after a GM re-link the claim already points at this uid.
+    if (!nameSnap.exists()) {
+      tx.set(nameRef(name), { uid, joinCode: JOIN_CODE })
+    }
     tx.set(playerRef(uid), {
       name,
       joinCode: JOIN_CODE,
@@ -95,18 +111,19 @@ export async function joinGame({ uid, name, pin, code }) {
       kills: 0,
       killedBy: null,
       diedAt: null,
-      isGM: name === GM_NAME,
       joinedAt: serverTimestamp(),
     })
     // PIN lives in private/, readable only by this player and the GM.
     tx.set(secretsRef(uid), { pin })
-    if (name === GM_NAME) {
-      // gmUid powers the GM-read rule on mission docs. Rules allow it to be
-      // set once, to yourself only.
-      tx.set(gameRef(), { gmUid: uid }, { merge: true })
-    }
   })
   postEvent('join', `${name} has entered the game`)
+}
+
+// PIN gate for the mission card. A human-level lock, not crypto: it stops
+// the mate who grabs an unlocked phone, not the mate with a debugger.
+export async function verifyPin(uid, pin) {
+  const snap = await getDoc(secretsRef(uid))
+  return snap.exists() && snap.data().pin === pin
 }
 
 // Start: shuffle all players into a single ring (Hamiltonian cycle — each

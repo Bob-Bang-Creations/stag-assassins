@@ -40,21 +40,44 @@ service cloud.firestore {
       }
 
       // gmUid unlocks every mission doc, so: absent, or set to yourself,
-      // or already set and unchanged. Never reassigned, never cleared.
+      // or already set and unchanged. Never reassigned, never CLEARED —
+      // once present it must stay present (deleting it and re-claiming was
+      // the bypass a review caught).
       function gmClaimOk() {
         return !('gmUid' in request.resource.data)
           || request.resource.data.gmUid == request.auth.uid;
       }
       function gmUnchanged() {
-        return !('gmUid' in request.resource.data)
-          || (('gmUid' in resource.data)
-              ? request.resource.data.gmUid == resource.data.gmUid
-              : request.resource.data.gmUid == request.auth.uid);
+        return ('gmUid' in resource.data)
+          ? ('gmUid' in request.resource.data
+              && request.resource.data.gmUid == resource.data.gmUid)
+          : (!('gmUid' in request.resource.data)
+              || request.resource.data.gmUid == request.auth.uid);
+      }
+
+      // Non-GM game-doc updates are limited to exactly the patches the app
+      // makes. Join: playerCount +1 (and gmUid set-once) while in lobby.
+      function joinPatch(keys) {
+        return keys.hasOnly(['playerCount', 'gmUid'])
+          && resource.data.status == 'lobby'
+          && (!keys.hasAny(['playerCount'])
+              || request.resource.data.playerCount
+                  == resource.data.get('playerCount', 0) + 1);
+      }
+      // Kill handshake end-state: the victim's phone flips the game to
+      // finished when the ring closes on the last assassin.
+      function finishPatch(keys) {
+        return keys.hasOnly(['status', 'winnerId', 'endsAt'])
+          && resource.data.status == 'active'
+          && request.resource.data.status == 'finished';
       }
 
       allow read: if signedIn();
       allow create: if signedIn() && codeOk(request.resource.data) && gmClaimOk();
-      allow update: if signedIn() && codeOk(request.resource.data) && gmUnchanged();
+      allow update: if signedIn() && codeOk(request.resource.data) && gmUnchanged()
+        && (isGM()
+            || joinPatch(request.resource.data.diff(resource.data).affectedKeys())
+            || finishPatch(request.resource.data.diff(resource.data).affectedKeys()));
       allow delete: if false;
 
       match /players/{playerId} {

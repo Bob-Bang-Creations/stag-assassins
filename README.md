@@ -66,7 +66,7 @@ Implemented in order, per the development plan:
 
 1. ✅ Join and lobby
 2. ✅ Ring shuffle on start
-3. ⬜ Mission card
+3. ✅ Mission card
 4. ⬜ Kill handshake transaction
 5. ⬜ Kill feed
 6. ⬜ GM panel

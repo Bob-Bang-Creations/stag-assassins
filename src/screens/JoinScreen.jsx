@@ -17,8 +17,9 @@ export default function JoinScreen({ uid, game, players }) {
         <h1 className="stamp">STAG ASSASSINS</h1>
         <div className="dossier-card">
           <p className="mono">
-            The game has already started — too late to join from here. Find
-            the Game Master.
+            {game.status === 'finished'
+              ? 'This game is over. Ask the Game Master about the next one.'
+              : 'The game has already started — too late to join from here. Find the Game Master.'}
           </p>
         </div>
       </div>
@@ -100,7 +101,7 @@ export default function JoinScreen({ uid, game, players }) {
           type="text"
           inputMode="numeric"
           maxLength={4}
-          autoComplete="one-time-code"
+          autoComplete="off"
           placeholder="0000"
           value={pin}
           onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}

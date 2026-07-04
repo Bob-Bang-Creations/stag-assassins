@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { startGame } from '../game'
 import { JOIN_CODE, ROSTER } from '../gameConfig'
 
-export default function LobbyScreen({ me, players }) {
+export default function LobbyScreen({ me, isGM, players }) {
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
 
@@ -56,7 +56,7 @@ export default function LobbyScreen({ me, players }) {
         </ul>
       </section>
 
-      {me.isGM ? (
+      {isGM ? (
         <section className="dossier-card">
           <p className="field-label">GAME MASTER</p>
           <p className="mono dim">

@@ -4,9 +4,10 @@ import { db, ensureSignedIn, isConfigured } from './firebase'
 import { GAME_ID, ROSTER } from './gameConfig'
 import JoinScreen from './screens/JoinScreen'
 import LobbyScreen from './screens/LobbyScreen'
+import MissionScreen from './screens/MissionScreen'
 
-// Dev-only: preview any screen without Firebase, e.g. /?preview=join
-// or /?preview=lobby. Stripped from production builds.
+// Dev-only: preview any screen without Firebase, e.g. /?preview=join,
+// ?preview=lobby or ?preview=mission. Stripped from production builds.
 function devPreview() {
   if (!import.meta.env.DEV) return null
   const which = new URLSearchParams(window.location.search).get('preview')
@@ -16,24 +17,31 @@ function devPreview() {
     name,
     status: 'alive',
     kills: 0,
-    isGM: name === 'Bob',
   }))
-  const fakeGame = { status: 'lobby', joinCode: 'STAG18', playerCount: 4 }
+  const fakeGame = {
+    status: 'lobby',
+    joinCode: 'STAG18',
+    playerCount: 4,
+    gmUid: 'fake-0',
+  }
   if (which === 'join') {
     return <JoinScreen uid="preview" game={fakeGame} players={fakePlayers} />
   }
   if (which === 'lobby') {
     return (
-      <LobbyScreen
-        uid="fake-0"
-        me={fakePlayers[0]}
-        game={fakeGame}
-        players={fakePlayers}
-      />
+      <LobbyScreen me={fakePlayers[0]} isGM players={fakePlayers} />
     )
   }
-  if (which === 'active') {
-    return <ActivePlaceholder />
+  if (which === 'mission') {
+    return (
+      <MissionScreen
+        uid="fake-0"
+        me={fakePlayers[0]}
+        mission={{ targetId: 'fake-2', object: 'a rubber duck', location: 'at the bar' }}
+        players={fakePlayers}
+        checkPin={(pin) => pin === '1234'}
+      />
+    )
   }
   return null
 }
@@ -44,6 +52,7 @@ export default function App() {
   const [game, setGame] = useState(undefined) // undefined = loading, null = no doc yet
   const [me, setMe] = useState(undefined)
   const [players, setPlayers] = useState([])
+  const [mission, setMission] = useState(null)
 
   useEffect(() => {
     if (!isConfigured) return undefined
@@ -72,21 +81,46 @@ export default function App() {
     return () => unsubs.forEach((unsub) => unsub())
   }, [uid])
 
+  // Own mission: only exists (and is only readable) once the game is live.
+  const gameActive = game?.status === 'active'
+  useEffect(() => {
+    if (!uid || !gameActive) {
+      setMission(null)
+      return undefined
+    }
+    return onSnapshot(
+      doc(db, 'games', GAME_ID, 'players', uid, 'private', 'mission'),
+      (snap) => setMission(snap.exists() ? snap.data() : null),
+    )
+  }, [uid, gameActive])
+
   const preview = devPreview()
   if (preview) return preview
 
-  if (!isConfigured) return <SetupNotice />
-  if (authError) return <AuthErrorScreen error={authError} />
-  if (!uid || me === undefined || game === undefined) return <LoadingScreen />
+  // GM status comes from the game doc's locked gmUid, never from a player
+  // doc field a joined player could forge.
+  const isGM = Boolean(uid && game && game.gmUid === uid)
 
   let screen
-  if (!me) {
+  if (!isConfigured) {
+    screen = <SetupNotice />
+  } else if (authError) {
+    screen = <AuthErrorScreen error={authError} />
+  } else if (!uid || me === undefined || game === undefined) {
+    screen = <LoadingScreen />
+  } else if (!me) {
     screen = <JoinScreen uid={uid} game={game} players={players} />
   } else if (game?.status === 'active') {
-    // Stage 3 replaces this with the mission card (and dead view later).
-    screen = <ActivePlaceholder />
+    screen =
+      me.status === 'alive' ? (
+        <MissionScreen uid={uid} me={me} mission={mission} players={players} />
+      ) : (
+        <DeadPlaceholder me={me} />
+      )
+  } else if (game?.status === 'finished') {
+    screen = <FinishedPlaceholder />
   } else {
-    screen = <LobbyScreen uid={uid} me={me} game={game} players={players} />
+    screen = <LobbyScreen me={me} isGM={isGM} players={players} />
   }
 
   return (
@@ -119,11 +153,23 @@ function OfflineBanner() {
   )
 }
 
-function ActivePlaceholder() {
+function DeadPlaceholder({ me }) {
   return (
     <div className="screen centered">
-      <h1 className="stamp">THE GAME IS AFOOT</h1>
-      <p className="mono dim">Your mission card arrives in the next build stage.</p>
+      <h1 className="stamp">ELIMINATED</h1>
+      <p className="mono dim">
+        {me.name}, your war is over. The spectator view arrives in a later
+        build stage.
+      </p>
+    </div>
+  )
+}
+
+function FinishedPlaceholder() {
+  return (
+    <div className="screen centered">
+      <h1 className="stamp">GAME OVER</h1>
+      <p className="mono dim">The winner screen arrives in a later build stage.</p>
     </div>
   )
 }
