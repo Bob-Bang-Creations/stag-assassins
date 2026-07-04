@@ -1,0 +1,262 @@
+/* Stag Assassins — dossier styling.
+   Dark surface, one stamped accent, typewriter utility face.
+   Built to be readable at arm's length in a dark pub, one-handed. */
+
+:root {
+  --bg: #111113;
+  --surface: #1a1a1e;
+  --surface-raised: #222226;
+  --border: #35353b;
+  --text: #e8e6e1;
+  --dim: #9a978f;
+  --accent: #d64545; /* the stamp */
+  --accent-dim: rgba(214, 69, 69, 0.15);
+
+  --display: 'Arial Narrow', 'Helvetica Neue Condensed', system-ui, sans-serif;
+  --mono: ui-monospace, 'Courier New', Courier, monospace;
+  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
+
+  color-scheme: dark;
+  font: 17px/1.45 var(--sans);
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100svh;
+  background: var(--bg);
+}
+
+#root {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100svh;
+}
+
+/* Layout */
+
+.screen {
+  padding: 20px 16px calc(32px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-height: 100svh;
+}
+
+.screen.centered {
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+.masthead {
+  text-align: center;
+  padding-top: 8px;
+}
+
+/* Type */
+
+.stamp {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: clamp(34px, 9vw, 44px);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin: 0 0 4px;
+  color: var(--accent);
+  text-shadow: 0 0 24px var(--accent-dim);
+}
+
+.mono {
+  font-family: var(--mono);
+  font-size: 15px;
+}
+
+.dim {
+  color: var(--dim);
+}
+
+.centered-text {
+  text-align: center;
+}
+
+p {
+  margin: 0;
+}
+
+code {
+  font-family: var(--mono);
+  background: var(--surface-raised);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* Dossier card */
+
+.dossier-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.field-label {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin: 0;
+}
+
+/* Inputs — huge tap targets throughout */
+
+.big-input {
+  width: 100%;
+  min-height: 56px;
+  padding: 12px 16px;
+  font-size: 20px;
+  background: var(--surface-raised);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  outline: none;
+}
+
+.big-input:focus {
+  border-color: var(--accent);
+}
+
+.big-input::placeholder {
+  color: var(--dim);
+  opacity: 0.6;
+}
+
+.hint {
+  font-size: 13px;
+}
+
+.error {
+  color: var(--accent);
+  font-size: 14px;
+  border-left: 3px solid var(--accent);
+  padding-left: 10px;
+}
+
+/* Buttons */
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+.primary-btn {
+  min-height: 60px;
+  width: 100%;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 20px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.primary-btn:disabled {
+  background: var(--surface-raised);
+  color: var(--dim);
+  cursor: not-allowed;
+}
+
+.primary-btn:not(:disabled):active {
+  transform: scale(0.98);
+}
+
+/* Join: roster name picker */
+
+.name-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.name-chip {
+  min-height: 52px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-raised);
+  color: var(--text);
+  font-size: 17px;
+}
+
+.name-chip.selected {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.name-chip:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.chip-note {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--dim);
+}
+
+/* Lobby roster */
+
+.roster-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.roster-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 48px;
+  border-bottom: 1px dashed var(--border);
+  gap: 12px;
+}
+
+.roster-row:last-child {
+  border-bottom: none;
+}
+
+.roster-row.waiting .roster-name {
+  color: var(--dim);
+}
+
+.roster-row.joined .roster-name {
+  font-weight: 600;
+}
+
+.roster-name {
+  font-size: 18px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

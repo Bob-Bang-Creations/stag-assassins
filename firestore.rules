@@ -1,0 +1,49 @@
+rules_version = '2';
+
+// Paste into Firebase console → Firestore → Rules (or `firebase deploy --only firestore:rules`).
+//
+// Threat model: 11 mates on a stag do. Anonymous Auth keeps randoms on the
+// internet out entirely. Mission secrets (target, object, location) live in
+// each player's private/mission doc, readable only by that player and the GM
+// — that stops the technical snoop. The 4-digit PIN in the app stops the
+// drunken one grabbing an unlocked phone. Writes are open to any signed-in
+// player because the kill handshake is a victim-driven transaction that has
+// to update the assassin's docs too.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /games/{gameId} {
+
+      function signedIn() {
+        return request.auth != null;
+      }
+
+      function isGM() {
+        return signedIn()
+          && get(/databases/$(database)/documents/games/$(gameId)).data.gmUid == request.auth.uid;
+      }
+
+      allow read, write: if signedIn();
+
+      match /players/{playerId} {
+        allow read, write: if signedIn();
+
+        // Mission secrets: owner and GM only.
+        match /private/{docId} {
+          allow read: if signedIn() && (request.auth.uid == playerId || isGM());
+          allow write: if signedIn();
+        }
+      }
+
+      // Name claims — the lock that prevents two phones taking one roster name.
+      match /names/{name} {
+        allow read, write: if signedIn();
+      }
+
+      // Public kill feed. Append-only from clients.
+      match /events/{eventId} {
+        allow read, create: if signedIn();
+      }
+    }
+  }
+}

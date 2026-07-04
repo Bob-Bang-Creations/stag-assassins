@@ -1,1 +1,56 @@
-# stag-assassins
+# Stag Assassins
+
+Mobile web app for a live assassins game — 11 players, one night, Manchester,
+Saturday 18 July 2026. Static frontend (Vite + React), Firebase Firestore +
+Anonymous Auth as the shared backend. See `PLAN.md`-style details in the
+development plan document.
+
+## Firebase setup (one-time, free — Spark plan only)
+
+Everything runs on the **Spark plan, which is permanently free and needs no
+credit card**. Do **not** enable Blaze or add billing at any point; nothing in
+this app needs it.
+
+1. Go to [console.firebase.google.com](https://console.firebase.google.com) and
+   create a project (e.g. `stag-assassins`). Decline Google Analytics.
+2. **Firestore:** Build → Firestore Database → Create database → production
+   mode → a European region (e.g. `europe-west2`, London).
+3. **Rules:** Firestore → Rules tab → paste the contents of
+   [`firestore.rules`](firestore.rules) → Publish.
+4. **Anonymous Auth:** Build → Authentication → Get started → Sign-in method →
+   Anonymous → Enable.
+5. **Web app config:** Project settings (gear icon) → Your apps → Web (`</>`)
+   → register the app (no hosting needed) → copy the `firebaseConfig` object
+   into [`src/firebaseConfig.js`](src/firebaseConfig.js). This config is not a
+   secret; it's safe to commit.
+
+## Game setup
+
+Edit [`src/gameConfig.js`](src/gameConfig.js):
+
+- `ROSTER` — the real 11 names (players pick from this list at join)
+- `GM_NAME` — which roster name gets the Game Master tools
+- `JOIN_CODE` — the code on the QR card / group chat
+
+## Run locally
+
+```bash
+npm install
+npm run dev
+```
+
+Open the printed URL. To simulate several players, use separate browser
+profiles or private windows (each gets its own anonymous identity — but warn
+the real group **not** to use private browsing on the night, it resets their
+identity on close).
+
+## Build stages
+
+Implemented in order, per the development plan:
+
+1. ✅ Join and lobby
+2. ⬜ Ring shuffle on start
+3. ⬜ Mission card
+4. ⬜ Kill handshake transaction
+5. ⬜ Kill feed
+6. ⬜ GM panel
