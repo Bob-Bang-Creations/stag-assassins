@@ -22,6 +22,7 @@ export default function GMScreen({ uid, me, players, reclaims, checkPin, loadRin
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
   const [ringStamp, setRingStamp] = useState(0)
+  const [showMyHunter, setShowMyHunter] = useState(false)
 
   useEffect(() => {
     function relock() {
@@ -140,7 +141,15 @@ export default function GMScreen({ uid, me, players, reclaims, checkPin, loadRin
                   label="FORCE CONFIRM DEATH"
                   armedLabel={`KILL ${v.name.toUpperCase()}? TAP AGAIN`}
                   onFire={() =>
-                    run('Force confirm', () => confirmDeath({ victimUid: v.id }))
+                    run('Force confirm', async () => {
+                      const outcome = await confirmDeath({ victimUid: v.id })
+                      if (outcome === 'assassin_dead') {
+                        throw new Error(
+                          'Tangled — the kill did not stand (their assassin ' +
+                            'died first). Adjudicate by hand.',
+                        )
+                      }
+                    })
                   }
                 />
               </div>
@@ -188,16 +197,40 @@ export default function GMScreen({ uid, me, players, reclaims, checkPin, loadRin
         <p className="field-label">THE RING (ADJUDICATION ONLY)</p>
         {ring === null ? (
           <p className="mono dim">Decrypting…</p>
+        ) : ring.length === 0 ? (
+          <p className="mono dim">
+            No missions readable — check signal and reopen the panel.
+          </p>
         ) : (
           <ul className="ring-list">
-            {ring.map((edge) => (
-              <li key={edge.hunter.id} className="ring-row mono">
-                <span className="ring-hunter">{edge.hunter.name}</span>
-                <span className="dim"> hunts </span>
-                <span className="ring-target">{edge.target?.name ?? '?'}</span>
-                <span className="dim"> · {edge.object} · {edge.location}</span>
-              </li>
-            ))}
+            {/* Your own hunter sinks to the bottom, redacted until tapped —
+                you're playing too, and adjudication rarely needs that row. */}
+            {[...ring]
+              .sort((a, b) => (a.target?.id === uid) - (b.target?.id === uid))
+              .map((edge) => {
+                const huntsMe = edge.target?.id === uid
+                if (huntsMe && !showMyHunter) {
+                  return (
+                    <li key={edge.hunter.id} className="ring-row mono">
+                      <button
+                        type="button"
+                        className="ghost-btn"
+                        onClick={() => setShowMyHunter(true)}
+                      >
+                        YOUR OWN HUNTER — TAP ONLY IF ADJUDICATING
+                      </button>
+                    </li>
+                  )
+                }
+                return (
+                  <li key={edge.hunter.id} className="ring-row mono">
+                    <span className="ring-hunter">{edge.hunter.name}</span>
+                    <span className="dim"> hunts </span>
+                    <span className="ring-target">{edge.target?.name ?? '?'}</span>
+                    <span className="dim"> · {edge.object} · {edge.location}</span>
+                  </li>
+                )
+              })}
           </ul>
         )}
       </section>

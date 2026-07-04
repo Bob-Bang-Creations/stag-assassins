@@ -84,3 +84,25 @@ Merge to `main` and the deploy workflow publishes to GitHub Pages
 (one-time: repo Settings → Pages → Source → "GitHub Actions"). The app URL
 will be `https://<owner>.github.io/stag-assassins/` — generate a QR code
 for it and drop it in the group chat on the Friday.
+
+## Tell the group (put this in the chat with the QR)
+
+- **iPhone users: pick ONE way to run it and stick with it all weekend.**
+  Either Add to Home Screen FIRST and always open the app icon, or just
+  keep using the Safari tab — never both. The home-screen app and Safari
+  have *separate identities*; switching between them mid-game looks like a
+  lost phone and needs a GM re-link.
+- No private browsing — it forgets who you are when it closes.
+- Remember your 4-digit PIN. It guards your mission card and it's the only
+  thing that lets you confirm your own death.
+
+## GM notes
+
+- If your own assassin reports a kill on you, your phone shows the death
+  confirm screen and the GM panel is unreachable behind it — resolve your
+  own death (confirm or dispute) first, then adjudicate others'.
+- Your GM identity cannot be re-linked in-app. Keep that phone charged. If
+  it dies for good, the Firebase console is the break-glass path (edit
+  `gmUid` on the game doc).
+- REMOVE gives no kill credit ("fled the city"); FORCE CONFIRM does. Pick
+  by what actually happened.

@@ -87,9 +87,12 @@ export default function LobbyScreen({ me, isGM, players, reclaims = [] }) {
           <ArmedButton
             className="primary-btn"
             disabled={busy}
-            requireArm={missing.length > 0}
             label={busy ? 'DEALING MISSIONS…' : 'START THE GAME'}
-            armedLabel={`${missing.length} MISSING — TAP AGAIN TO START ANYWAY`}
+            armedLabel={
+              missing.length > 0
+                ? `${missing.length} MISSING — TAP AGAIN TO START ANYWAY`
+                : 'DEAL MISSIONS? TAP AGAIN'
+            }
             onFire={handleStart}
           />
           <p className="hint mono dim">

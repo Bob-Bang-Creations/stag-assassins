@@ -193,10 +193,18 @@ export async function gmApproveReclaim({ newUid, players = [], reclaims = [] }) 
       const missionSnaps = await Promise.all(
         others.map((p) => tx.get(missionRef(p.id))),
       )
-      missionSnaps.forEach((snap, i) => {
-        if (snap.exists() && snap.data().targetId === oldUid) {
-          hunterUid = others[i].id
-        }
+      // A just-killed player's stale mission can also point at oldUid (the
+      // UI snapshot may lag), so re-verify alive status in-transaction and
+      // never rewire a corpse instead of the live hunter.
+      const candidates = others.filter(
+        (p, i) =>
+          missionSnaps[i].exists() && missionSnaps[i].data().targetId === oldUid,
+      )
+      const candidateSnaps = await Promise.all(
+        candidates.map((p) => tx.get(playerRef(p.id))),
+      )
+      candidateSnaps.forEach((snap, i) => {
+        if (snap.data()?.status === 'alive') hunterUid = candidates[i].id
       })
       const oldTargetId = oldMissionSnap.data()?.targetId
       if (oldTargetId && oldTargetId !== newUid) {
@@ -570,24 +578,25 @@ export async function disputeKill({ victimUid, victimName }) {
     if (!victim || victim.status !== 'alive' || !victim.pendingKillFrom) {
       return // nothing to dispute (already resolved)
     }
-    const assassinMissionSnap = await tx.get(missionRef(victim.pendingKillFrom))
     tx.update(playerRef(victimUid), {
       pendingKillFrom: null,
       pendingKillObject: null,
       pendingKillLocation: null,
       pendingKillAt: null,
     })
-    if (assassinMissionSnap.exists()) {
-      tx.set(
-        missionRef(victim.pendingKillFrom),
-        {
-          object: randomFrom(OBJECTS),
-          location: randomFrom(LOCATIONS),
-          assignedAt: serverTimestamp(),
-        },
-        { merge: true },
-      )
-    }
+    // No existence read first: the victim may WRITE the assassin's mission
+    // (kill-handshake rule) but may not READ it — a tx.get here is
+    // permission-denied and would brick the dispute button. The assassin
+    // necessarily had a mission to report from, so merge blindly.
+    tx.set(
+      missionRef(victim.pendingKillFrom),
+      {
+        object: randomFrom(OBJECTS),
+        location: randomFrom(LOCATIONS),
+        assignedAt: serverTimestamp(),
+      },
+      { merge: true },
+    )
     cleared = true
   })
   if (cleared) {
