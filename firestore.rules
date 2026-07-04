@@ -39,6 +39,16 @@ service cloud.firestore {
           && get(/databases/$(database)/documents/games/$(gameId)).data.gmUid == request.auth.uid;
       }
 
+      // Dead players become spectators: the full ring is revealed to them
+      // (honour-bound to silence). Everyone sees everything once it's over.
+      function isDeadSpectator() {
+        return signedIn()
+          && get(/databases/$(database)/documents/games/$(gameId)/players/$(request.auth.uid)).data.status == 'dead';
+      }
+      function gameFinished() {
+        return get(/databases/$(database)/documents/games/$(gameId)).data.status == 'finished';
+      }
+
       // gmUid unlocks every mission doc, so: absent, or set to yourself,
       // or already set and unchanged. Never reassigned, never CLEARED —
       // once present it must stay present (deleting it and re-claiming was
@@ -92,9 +102,13 @@ service cloud.firestore {
         allow update: if isPlayer() || isGM();
         allow delete: if isGM();
 
-        // Mission secrets (target, object, location) and PIN.
+        // Mission secrets (target, object, location) and PIN. Spectators
+        // get missions only — never other people's PINs.
         match /private/{docId} {
-          allow read: if signedIn() && (request.auth.uid == playerId || isGM());
+          allow read: if signedIn()
+            && (request.auth.uid == playerId || isGM()
+                || (docId == 'mission'
+                    && (isDeadSpectator() || gameFinished())));
           // Own docs are writable during join (before the player doc
           // exists); otherwise joined players (kill handshake writes the
           // assassin's next mission) and the GM.

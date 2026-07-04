@@ -1,9 +1,21 @@
 import { useState } from 'react'
-import { confirmDeath, disputeKill } from '../game'
+import { confirmDeath, disputeKill, verifyPin } from '../game'
 
 // The victim's phone flips here the moment their assassin reports the kill.
-// Victim-driven by design: assassins have every incentive to lie.
-export default function DeathConfirmScreen({ me, players, onConfirm, onDispute }) {
+// Victim-driven by design: assassins have every incentive to lie. Confirming
+// is the game's one irreversible action, so it is PIN-gated — the assassin
+// (or anyone else) holding this phone must not be able to kill its owner.
+// Dispute stays open: the worst a phone-grabber can do with it is summon
+// the GM.
+export default function DeathConfirmScreen({
+  me,
+  players,
+  onConfirm,
+  onDispute,
+  checkPin,
+  onNotice,
+}) {
+  const [pin, setPin] = useState('')
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
 
@@ -14,12 +26,22 @@ export default function DeathConfirmScreen({ me, players, onConfirm, onDispute }
     setError(null)
     setBusy(true)
     try {
-      const outcome = await (onConfirm ? onConfirm() : confirmDeath({ victimUid: me.id }))
-      if (outcome === 'assassin_dead') {
-        setError(
-          'Tangled kill: your assassin was eliminated first. Find the Game Master.',
-        )
+      const pinOk = await (checkPin ? checkPin(pin) : verifyPin(me.id, pin))
+      if (!pinOk) {
+        setError('Wrong PIN. Only the deceased may confirm their own death.')
         setBusy(false)
+        return
+      }
+      const outcome = await (onConfirm
+        ? onConfirm()
+        : confirmDeath({ victimUid: me.id }))
+      if (outcome === 'assassin_dead' && onNotice) {
+        // Surfaced at App level: this screen unmounts the moment the
+        // pending flag clears.
+        onNotice(
+          'Tangled kill: your assassin was eliminated first, so this one ' +
+            "couldn't stand. Find the Game Master.",
+        )
       }
       // Otherwise your player doc flips to dead and App reroutes.
     } catch (err) {
@@ -57,12 +79,27 @@ export default function DeathConfirmScreen({ me, players, onConfirm, onDispute }
           didn't happen like that, dispute it.
         </p>
 
+        <label className="field-label" htmlFor="death-pin">
+          YOUR PIN TO CONFIRM
+        </label>
+        <input
+          id="death-pin"
+          className="big-input mono pin-mask"
+          type="text"
+          inputMode="numeric"
+          maxLength={4}
+          autoComplete="off"
+          placeholder="0000"
+          value={pin}
+          onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
+        />
+
         {error && <p className="error mono">{error}</p>}
 
         <button
           type="button"
           className="primary-btn"
-          disabled={busy}
+          disabled={busy || !/^\d{4}$/.test(pin)}
           onClick={handleConfirm}
         >
           {busy ? '…' : "IT'S TRUE. I'M DEAD"}

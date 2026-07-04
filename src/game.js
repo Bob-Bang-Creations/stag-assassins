@@ -12,7 +12,6 @@ import {
   getDoc,
   runTransaction,
   serverTimestamp,
-  updateDoc,
 } from 'firebase/firestore'
 import { db } from './firebase'
 import { GAME_ID, GM_NAME, JOIN_CODE, LOCATIONS, OBJECTS } from './gameConfig'
@@ -124,6 +123,29 @@ export async function joinGame({ uid, name, pin, code }) {
   postEvent('join', `${name} has entered the game`)
 }
 
+// Spectator ring reveal: dead players (and anyone once the game finishes)
+// may read every mission per the rules. Returns [{hunter, target, object,
+// location}] for all alive players; misses resolve to null and are skipped.
+export async function fetchRing(players) {
+  const alive = players.filter((p) => p.status === 'alive')
+  const snaps = await Promise.all(
+    alive.map((p) => getDoc(missionRef(p.id)).catch(() => null)),
+  )
+  const byId = new Map(players.map((p) => [p.id, p]))
+  return alive
+    .map((p, i) => {
+      const mission = snaps[i]?.exists() ? snaps[i].data() : null
+      if (!mission) return null
+      return {
+        hunter: p,
+        target: byId.get(mission.targetId) ?? null,
+        object: mission.object,
+        location: mission.location,
+      }
+    })
+    .filter(Boolean)
+}
+
 // PIN gate for the mission card. A human-level lock, not crypto: it stops
 // the mate who grabs an unlocked phone, not the mate with a debugger.
 export async function verifyPin(uid, pin) {
@@ -167,13 +189,28 @@ export async function startGame({ players }) {
 // Kill handshake, step 1 (assassin): flag the target's player doc. Their
 // phone is already listening and flips to the confirm screen. The object
 // and location ride along so the victim's phone can write the feed line —
-// it cannot read the assassin's mission doc.
+// it cannot read the assassin's mission doc. Transactional so a report
+// can't land on a player who just died or a game that just ended (stale
+// snapshots happen when two listeners deliver out of step).
 export async function reportKill({ assassinUid, targetId, object, location }) {
-  await updateDoc(playerRef(targetId), {
-    pendingKillFrom: assassinUid,
-    pendingKillObject: object,
-    pendingKillLocation: location,
-    pendingKillAt: serverTimestamp(),
+  await runTransaction(db, async (tx) => {
+    const gameSnap = await tx.get(gameRef())
+    if (gameSnap.data()?.status !== 'active') {
+      throw new Error('The game is not live.')
+    }
+    const targetSnap = await tx.get(playerRef(targetId))
+    const target = targetSnap.data()
+    if (!target || target.status !== 'alive') {
+      throw new Error(
+        'Your target is already dead. A new mission is on its way.',
+      )
+    }
+    tx.update(playerRef(targetId), {
+      pendingKillFrom: assassinUid,
+      pendingKillObject: object,
+      pendingKillLocation: location,
+      pendingKillAt: serverTimestamp(),
+    })
   })
 }
 
@@ -233,6 +270,9 @@ export async function confirmDeath({ victimUid }) {
       status: 'dead',
       killedBy: assassinUid,
       diedAt: serverTimestamp(),
+      // Preserved for the gravestone ("Taken at the bar with a teabag").
+      diedWhere: victim.pendingKillLocation ?? null,
+      diedWith: victim.pendingKillObject ?? null,
     })
     tx.update(playerRef(assassinUid), { kills: (assassin.kills ?? 0) + 1 })
     feed = [
@@ -258,15 +298,29 @@ export async function confirmDeath({ victimUid }) {
 }
 
 // Kill handshake, dispute branch: clear the flag, point both at the GM.
+// Transactional so a dispute racing a confirm can't post a misleading
+// "disputes their elimination" line after the death already stood.
 export async function disputeKill({ victimUid, victimName }) {
-  await updateDoc(playerRef(victimUid), {
-    pendingKillFrom: null,
-    pendingKillObject: null,
-    pendingKillLocation: null,
-    pendingKillAt: null,
+  let cleared = false
+  await runTransaction(db, async (tx) => {
+    cleared = false
+    const victimSnap = await tx.get(playerRef(victimUid))
+    const victim = victimSnap.data()
+    if (!victim || victim.status !== 'alive' || !victim.pendingKillFrom) {
+      return // nothing to dispute (already resolved)
+    }
+    tx.update(playerRef(victimUid), {
+      pendingKillFrom: null,
+      pendingKillObject: null,
+      pendingKillLocation: null,
+      pendingKillAt: null,
+    })
+    cleared = true
   })
-  postEvent(
-    'gm_action',
-    `${victimName} disputes their elimination — Game Master to adjudicate.`,
-  )
+  if (cleared) {
+    postEvent(
+      'gm_action',
+      `${victimName} disputes their elimination — Game Master to adjudicate.`,
+    )
+  }
 }

@@ -152,11 +152,18 @@ export default function MissionScreen({ uid, me, mission, players, checkPin }) {
             phone. If theirs is dead (the phone), get the Game Master.
           </p>
         )}
+        {target && target.status !== 'alive' && (
+          <p className="hint mono dim">
+            Your target is already dead. A new mission is on its way.
+          </p>
+        )}
         {reportError && <p className="error mono">{reportError}</p>}
         <button
           type="button"
           className="primary-btn"
-          disabled={!target || awaitingConfirm || reporting}
+          disabled={
+            !target || target.status !== 'alive' || awaitingConfirm || reporting
+          }
           onClick={handleReportKill}
         >
           {awaitingConfirm

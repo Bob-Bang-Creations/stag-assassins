@@ -1,14 +1,25 @@
 import { useEffect, useState } from 'react'
-import { collection, doc, onSnapshot } from 'firebase/firestore'
+import {
+  collection,
+  doc,
+  limit,
+  onSnapshot,
+  orderBy,
+  query,
+} from 'firebase/firestore'
 import { db, ensureSignedIn, isConfigured } from './firebase'
 import { GAME_ID, ROSTER } from './gameConfig'
+import DeadScreen from './screens/DeadScreen'
 import DeathConfirmScreen from './screens/DeathConfirmScreen'
+import FeedScreen from './screens/FeedScreen'
 import JoinScreen from './screens/JoinScreen'
 import LobbyScreen from './screens/LobbyScreen'
 import MissionScreen from './screens/MissionScreen'
+import WinnerScreen from './screens/WinnerScreen'
 
 // Dev-only: preview any screen without Firebase, e.g. /?preview=join,
-// ?preview=lobby or ?preview=mission. Stripped from production builds.
+// ?preview=mission, ?preview=feed, ?preview=dead, ?preview=winner.
+// Stripped from production builds.
 function devPreview() {
   if (!import.meta.env.DEV) return null
   const which = new URLSearchParams(window.location.search).get('preview')
@@ -16,22 +27,34 @@ function devPreview() {
   const fakePlayers = ['Bob', 'Alex', 'Liam', 'Matt'].map((name, i) => ({
     id: `fake-${i}`,
     name,
-    status: 'alive',
-    kills: 0,
+    status: i === 3 ? 'dead' : 'alive',
+    kills: i === 0 ? 2 : 0,
+    diedWhere: 'in the smoking area',
+    diedWith: 'a teabag',
+    killedBy: 'fake-0',
   }))
   const fakeGame = {
     status: 'lobby',
     joinCode: 'STAG18',
     playerCount: 4,
     gmUid: 'fake-0',
+    winnerId: 'fake-0',
   }
+  const fakeEvents = [
+    { id: 'e3', type: 'kill', text: 'Matt was eliminated in the smoking area with a teabag', at: null },
+    { id: 'e2', type: 'start', text: 'The game is afoot.', at: null },
+    { id: 'e1', type: 'join', text: 'Bob has entered the game', at: null },
+  ]
+  const fakeRing = [
+    { hunter: fakePlayers[0], target: fakePlayers[1], object: 'a rubber duck', location: 'at the bar' },
+    { hunter: fakePlayers[1], target: fakePlayers[2], object: 'a beer mat', location: 'by the door' },
+    { hunter: fakePlayers[2], target: fakePlayers[0], object: 'a 1p coin', location: 'in any queue' },
+  ]
   if (which === 'join') {
     return <JoinScreen uid="preview" game={fakeGame} players={fakePlayers} />
   }
   if (which === 'lobby') {
-    return (
-      <LobbyScreen me={fakePlayers[0]} isGM players={fakePlayers} />
-    )
+    return <LobbyScreen me={fakePlayers[0]} isGM players={fakePlayers} />
   }
   if (which === 'mission') {
     return (
@@ -54,8 +77,32 @@ function devPreview() {
           pendingKillLocation: 'in the smoking area',
         }}
         players={fakePlayers}
+        checkPin={(pin) => pin === '1234'}
         onConfirm={async () => 'died'}
         onDispute={async () => {}}
+      />
+    )
+  }
+  if (which === 'feed') {
+    return <FeedScreen players={fakePlayers} events={fakeEvents} />
+  }
+  if (which === 'dead') {
+    return (
+      <DeadScreen
+        me={fakePlayers[3]}
+        players={fakePlayers}
+        events={fakeEvents}
+        loadRing={async () => fakeRing}
+      />
+    )
+  }
+  if (which === 'winner') {
+    return (
+      <WinnerScreen
+        me={fakePlayers[0]}
+        game={{ ...fakeGame, status: 'finished' }}
+        players={fakePlayers}
+        events={fakeEvents}
       />
     )
   }
@@ -69,6 +116,9 @@ export default function App() {
   const [me, setMe] = useState(undefined)
   const [players, setPlayers] = useState([])
   const [mission, setMission] = useState(null)
+  const [events, setEvents] = useState([])
+  const [tab, setTab] = useState('mission') // 'mission' | 'feed'
+  const [notice, setNotice] = useState(null)
 
   useEffect(() => {
     if (!isConfigured) return undefined
@@ -93,6 +143,15 @@ export default function App() {
         list.sort((a, b) => ROSTER.indexOf(a.name) - ROSTER.indexOf(b.name))
         setPlayers(list)
       }),
+      onSnapshot(
+        query(
+          collection(db, 'games', GAME_ID, 'events'),
+          orderBy('at', 'desc'),
+          limit(100),
+        ),
+        (snap) =>
+          setEvents(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+      ),
     ]
     return () => unsubs.forEach((unsub) => unsub())
   }, [uid])
@@ -118,6 +177,7 @@ export default function App() {
   const isGM = Boolean(uid && game && game.gmUid === uid)
 
   let screen
+  let tabs = null
   if (!isConfigured) {
     screen = <SetupNotice />
   } else if (authError) {
@@ -128,16 +188,41 @@ export default function App() {
     screen = <JoinScreen uid={uid} game={game} players={players} />
   } else if (game?.status === 'active') {
     if (me.status !== 'alive') {
-      screen = <DeadPlaceholder me={me} />
+      screen = <DeadScreen me={me} players={players} events={events} />
     } else if (me.pendingKillFrom) {
-      screen = <DeathConfirmScreen me={me} players={players} />
-    } else {
       screen = (
-        <MissionScreen uid={uid} me={me} mission={mission} players={players} />
+        <DeathConfirmScreen me={me} players={players} onNotice={setNotice} />
       )
+    } else {
+      tabs = (
+        <nav className="tab-bar">
+          <button
+            type="button"
+            className={`tab ${tab === 'mission' ? 'active' : ''}`}
+            onClick={() => setTab('mission')}
+          >
+            DOSSIER
+          </button>
+          <button
+            type="button"
+            className={`tab ${tab === 'feed' ? 'active' : ''}`}
+            onClick={() => setTab('feed')}
+          >
+            FEED
+          </button>
+        </nav>
+      )
+      screen =
+        tab === 'feed' ? (
+          <FeedScreen players={players} events={events} />
+        ) : (
+          <MissionScreen uid={uid} me={me} mission={mission} players={players} />
+        )
     }
   } else if (game?.status === 'finished') {
-    screen = <FinishedPlaceholder />
+    screen = (
+      <WinnerScreen me={me} game={game} players={players} events={events} />
+    )
   } else {
     screen = <LobbyScreen me={me} isGM={isGM} players={players} />
   }
@@ -145,7 +230,20 @@ export default function App() {
   return (
     <>
       <OfflineBanner />
+      {notice && (
+        <div className="notice-banner mono" role="status">
+          <span>{notice}</span>
+          <button
+            type="button"
+            className="notice-dismiss"
+            onClick={() => setNotice(null)}
+          >
+            ✕
+          </button>
+        </div>
+      )}
       {screen}
+      {tabs}
     </>
   )
 }
@@ -168,27 +266,6 @@ function OfflineBanner() {
   return (
     <div className="offline-banner mono" role="status">
       NO SIGNAL — reconnecting. Don't refresh; hold your position.
-    </div>
-  )
-}
-
-function DeadPlaceholder({ me }) {
-  return (
-    <div className="screen centered">
-      <h1 className="stamp">ELIMINATED</h1>
-      <p className="mono dim">
-        {me.name}, your war is over. The spectator view arrives in a later
-        build stage.
-      </p>
-    </div>
-  )
-}
-
-function FinishedPlaceholder() {
-  return (
-    <div className="screen centered">
-      <h1 className="stamp">GAME OVER</h1>
-      <p className="mono dim">The winner screen arrives in a later build stage.</p>
     </div>
   )
 }

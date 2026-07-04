@@ -359,6 +359,169 @@ button {
   text-transform: uppercase;
 }
 
+/* Feed, graveyard, dead view, winner */
+
+.grave-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.grave-chip {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 52px;
+  justify-content: center;
+}
+
+.grave-chip.dead {
+  opacity: 0.45;
+}
+
+.grave-chip.winner {
+  border-color: var(--accent);
+}
+
+.grave-name {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.grave-kills {
+  font-size: 12px;
+}
+
+.feed-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.feed-row {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.feed-time {
+  flex-shrink: 0;
+  font-size: 12px;
+}
+
+.feed-kill .feed-text {
+  color: var(--text);
+}
+
+.feed-row:not(.feed-kill) .feed-text {
+  color: var(--dim);
+}
+
+.feed-win .feed-text,
+.feed-gm_action .feed-text {
+  color: var(--accent);
+}
+
+.gravestone {
+  text-align: center;
+  border-width: 2px;
+}
+
+.grave-rip {
+  font-size: 44px;
+  color: var(--dim);
+}
+
+.ring-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ring-row {
+  font-size: 14px;
+  line-height: 1.5;
+  border-bottom: 1px dashed var(--border);
+  padding-bottom: 8px;
+}
+
+.ring-row:last-child {
+  border-bottom: none;
+}
+
+.ring-hunter,
+.ring-target {
+  font-weight: 700;
+}
+
+/* Tabs (alive players: dossier / feed) */
+
+.tab-bar {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  max-width: 480px;
+  margin: 0 auto;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.tab {
+  flex: 1;
+  min-height: 56px;
+  background: none;
+  border: none;
+  color: var(--dim);
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: 0.14em;
+}
+
+.tab.active {
+  color: var(--accent);
+  box-shadow: inset 0 3px 0 var(--accent);
+}
+
+/* Notice banner (e.g. tangled kill — survives screen changes) */
+
+.notice-banner {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--surface-raised);
+  border-bottom: 2px solid var(--accent);
+  color: var(--text);
+  padding: 12px 14px;
+  font-size: 13px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.notice-dismiss {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--dim);
+  min-width: 40px;
+  min-height: 40px;
+  font-size: 16px;
+}
+
 /* PIN masking without type=password (which triggers iOS keychain UI) */
 
 .pin-mask {
