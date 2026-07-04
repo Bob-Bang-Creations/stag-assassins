@@ -1,0 +1,151 @@
+rules_version = '2';
+
+// Paste into Firebase console → Firestore → Rules (or `firebase deploy --only firestore:rules`).
+//
+// Threat model: 11 mates on a stag do, plus whoever finds the hosted URL on
+// a printed QR card. Layers:
+//   - The join code (also checked in rules, not just the client) stops
+//     drive-by writes from anyone who merely loads the page.
+//   - Mission secrets and PINs live in each player's private/ subcollection,
+//     readable only by that player and the GM — stops the technical snoop.
+//   - gmUid is set once, only to yourself, and never changed, so the GM role
+//     (and its read-everything power) cannot be seized from the console.
+//   - The 4-digit PIN in the app stops the drunken mate grabbing an unlocked
+//     phone.
+// Writes between players stay open where the kill handshake needs them: it
+// is a victim-driven transaction that must update the assassin's docs too.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /games/{gameId} {
+
+      // KEEP IN SYNC with JOIN_CODE in src/gameConfig.js. Not a secret —
+      // it's on the QR card — but it gates writes to people at the party.
+      function codeOk(data) {
+        return data.joinCode == 'STAG18';
+      }
+
+      function signedIn() {
+        return request.auth != null;
+      }
+
+      function isPlayer() {
+        return signedIn()
+          && exists(/databases/$(database)/documents/games/$(gameId)/players/$(request.auth.uid));
+      }
+
+      function isGM() {
+        return signedIn()
+          && get(/databases/$(database)/documents/games/$(gameId)).data.gmUid == request.auth.uid;
+      }
+
+      // Dead players become spectators: the full ring is revealed to them
+      // (honour-bound to silence). Everyone sees everything once it's over.
+      function isDeadSpectator() {
+        return signedIn()
+          && get(/databases/$(database)/documents/games/$(gameId)/players/$(request.auth.uid)).data.status == 'dead';
+      }
+      function gameFinished() {
+        return get(/databases/$(database)/documents/games/$(gameId)).data.status == 'finished';
+      }
+
+      // gmUid unlocks every mission doc, so: absent, or set to yourself,
+      // or already set and unchanged. Never reassigned, never CLEARED —
+      // once present it must stay present (deleting it and re-claiming was
+      // the bypass a review caught).
+      function gmClaimOk() {
+        return !('gmUid' in request.resource.data)
+          || request.resource.data.gmUid == request.auth.uid;
+      }
+      function gmUnchanged() {
+        return ('gmUid' in resource.data)
+          ? ('gmUid' in request.resource.data
+              && request.resource.data.gmUid == resource.data.gmUid)
+          : (!('gmUid' in request.resource.data)
+              || request.resource.data.gmUid == request.auth.uid);
+      }
+
+      // Non-GM game-doc updates are limited to exactly the patches the app
+      // makes. Join: playerCount +1 (and gmUid set-once) while in lobby.
+      function joinPatch(keys) {
+        return keys.hasOnly(['playerCount', 'gmUid'])
+          && resource.data.status == 'lobby'
+          && (!keys.hasAny(['playerCount'])
+              || request.resource.data.playerCount
+                  == resource.data.get('playerCount', 0) + 1);
+      }
+      // Kill handshake end-state: the victim's phone flips the game to
+      // finished when the ring closes on the last assassin.
+      function finishPatch(keys) {
+        return keys.hasOnly(['status', 'winnerId', 'endsAt'])
+          && resource.data.status == 'active'
+          && request.resource.data.status == 'finished';
+      }
+
+      allow read: if signedIn();
+      allow create: if signedIn() && codeOk(request.resource.data) && gmClaimOk();
+      allow update: if signedIn() && codeOk(request.resource.data) && gmUnchanged()
+        && (isGM()
+            || joinPatch(request.resource.data.diff(resource.data).affectedKeys())
+            || finishPatch(request.resource.data.diff(resource.data).affectedKeys()));
+      allow delete: if false;
+
+      match /players/{playerId} {
+        allow read: if signedIn();
+        // Join: only as yourself, only with the code. GM can create docs
+        // for the re-link recovery tool.
+        allow create: if (signedIn() && playerId == request.auth.uid
+                          && codeOk(request.resource.data))
+                       || isGM();
+        // Any joined player may update any player doc — the kill handshake
+        // (victim-driven) updates the assassin's doc too.
+        allow update: if isPlayer() || isGM();
+        allow delete: if isGM();
+
+        // Mission secrets (target, object, location) and PIN. Spectators
+        // get missions only — never other people's PINs.
+        match /private/{docId} {
+          allow read: if signedIn()
+            && (request.auth.uid == playerId || isGM()
+                || (docId == 'mission'
+                    && (isDeadSpectator() || gameFinished())));
+          // Own docs are writable during join (before the player doc
+          // exists) and by the GM. Cross-player writes are allowed for
+          // MISSIONS ONLY (the kill handshake writes the assassin's next
+          // mission) — never another player's PIN, or a hostile mate could
+          // overwrite it and then "know" it.
+          allow write: if (signedIn() && request.auth.uid == playerId)
+                        || isGM()
+                        || (isPlayer() && docId == 'mission');
+        }
+      }
+
+      // Name claims: the lock that stops two phones taking one roster name.
+      // Create-only as yourself; moving a name to a new phone is a GM
+      // recovery tool.
+      match /names/{name} {
+        allow read: if signedIn();
+        allow create: if signedIn()
+          && request.resource.data.uid == request.auth.uid
+          && codeOk(request.resource.data);
+        allow update, delete: if isGM();
+      }
+
+      // Public kill feed. Append-only, joined players only.
+      match /events/{eventId} {
+        allow read: if signedIn();
+        allow create: if isPlayer();
+      }
+
+      // Phone-switch recovery: a new device posts a request under its own
+      // uid; the GM approves (which migrates the player) or deletes it.
+      match /reclaims/{uid} {
+        allow read: if isGM();
+        allow create, update: if signedIn()
+          && request.auth.uid == uid
+          && codeOk(request.resource.data);
+        allow delete: if isGM();
+      }
+    }
+  }
+}

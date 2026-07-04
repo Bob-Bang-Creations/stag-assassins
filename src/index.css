@@ -1,0 +1,604 @@
+/* Stag Assassins — dossier styling.
+   Dark surface, one stamped accent, typewriter utility face.
+   Built to be readable at arm's length in a dark pub, one-handed. */
+
+:root {
+  --bg: #111113;
+  --surface: #1a1a1e;
+  --surface-raised: #222226;
+  --border: #35353b;
+  --text: #e8e6e1;
+  --dim: #9a978f;
+  --accent: #d64545; /* the stamp */
+  --accent-dim: rgba(214, 69, 69, 0.15);
+
+  --display: 'Arial Narrow', 'Helvetica Neue Condensed', system-ui, sans-serif;
+  --mono: ui-monospace, 'Courier New', Courier, monospace;
+  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
+
+  color-scheme: dark;
+  font: 17px/1.45 var(--sans);
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100svh;
+  background: var(--bg);
+}
+
+#root {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100svh;
+}
+
+/* Layout */
+
+.screen {
+  padding: 20px 16px calc(32px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-height: 100svh;
+}
+
+.screen.centered {
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+.masthead {
+  text-align: center;
+  padding-top: 8px;
+}
+
+/* Type */
+
+.stamp {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: clamp(34px, 9vw, 44px);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin: 0 0 4px;
+  color: var(--accent);
+  text-shadow: 0 0 24px var(--accent-dim);
+}
+
+.mono {
+  font-family: var(--mono);
+  font-size: 15px;
+}
+
+.dim {
+  color: var(--dim);
+}
+
+.centered-text {
+  text-align: center;
+}
+
+p {
+  margin: 0;
+}
+
+code {
+  font-family: var(--mono);
+  background: var(--surface-raised);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* Dossier card */
+
+.dossier-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.field-label {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin: 0;
+}
+
+/* Inputs — huge tap targets throughout */
+
+.big-input {
+  width: 100%;
+  min-height: 56px;
+  padding: 12px 16px;
+  font-size: 20px;
+  background: var(--surface-raised);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  outline: none;
+}
+
+.big-input:focus {
+  border-color: var(--accent);
+}
+
+.big-input::placeholder {
+  color: var(--dim);
+  opacity: 0.6;
+}
+
+.hint {
+  font-size: 13px;
+}
+
+.error {
+  color: var(--accent);
+  font-size: 14px;
+  border-left: 3px solid var(--accent);
+  padding-left: 10px;
+}
+
+/* Buttons */
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+.primary-btn {
+  min-height: 60px;
+  width: 100%;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 20px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.primary-btn:disabled {
+  background: var(--surface-raised);
+  color: var(--dim);
+  cursor: not-allowed;
+}
+
+.primary-btn:not(:disabled):active {
+  transform: scale(0.98);
+}
+
+/* Join: roster name picker */
+
+.name-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.name-chip {
+  min-height: 52px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-raised);
+  color: var(--text);
+  font-size: 17px;
+}
+
+.name-chip.selected {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.name-chip:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.chip-note {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--dim);
+}
+
+/* Lobby roster */
+
+.roster-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.roster-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 48px;
+  border-bottom: 1px dashed var(--border);
+  gap: 12px;
+}
+
+.roster-row:last-child {
+  border-bottom: none;
+}
+
+.roster-row.waiting .roster-name {
+  color: var(--dim);
+}
+
+.roster-row.joined .roster-name {
+  font-weight: 600;
+}
+
+.roster-name {
+  font-size: 18px;
+}
+
+/* Mission card — the dossier slid across the table */
+
+.mission-card {
+  width: 100%;
+  border-width: 2px;
+  gap: 18px;
+}
+
+.classified-stamp {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 40px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--accent);
+  border: 3px solid var(--accent);
+  border-radius: 6px;
+  padding: 10px 6px;
+  margin: 4px 0;
+  transform: rotate(-4deg);
+  opacity: 0.9;
+}
+
+.mission-row {
+  border-bottom: 1px dashed var(--border);
+  padding-bottom: 12px;
+}
+
+.mission-label {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.24em;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+
+.mission-value {
+  font-family: var(--mono);
+  font-size: 22px;
+  line-height: 1.3;
+}
+
+.mission-value.target-name {
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+/* Redaction reveal: a black bar slides off each secret when the card opens */
+
+.redact {
+  position: relative;
+  display: inline-block;
+  overflow: hidden;
+}
+
+.redact::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: #000;
+  transform: translateX(0);
+}
+
+.mission-card.open .redact::after {
+  transform: translateX(103%);
+  transition: transform 0.7s cubic-bezier(0.6, 0, 0.2, 1);
+}
+
+.mission-row:nth-child(3) .redact::after { transition-delay: 0.25s; }
+.mission-row:nth-child(4) .redact::after { transition-delay: 0.5s; }
+
+.final-two {
+  color: var(--accent);
+  border: 1px dashed var(--accent);
+  border-radius: 6px;
+  padding: 10px 12px;
+  text-align: center;
+  font-size: 14px;
+}
+
+.death-question {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 28px;
+  letter-spacing: 0.1em;
+  text-align: center;
+}
+
+.ghost-btn {
+  min-height: 52px;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--dim);
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* Feed, graveyard, dead view, winner */
+
+.grave-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.grave-chip {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 52px;
+  justify-content: center;
+}
+
+.grave-chip.dead {
+  opacity: 0.45;
+}
+
+.grave-chip.winner {
+  border-color: var(--accent);
+}
+
+.grave-name {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.grave-kills {
+  font-size: 12px;
+}
+
+.feed-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.feed-row {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.feed-time {
+  flex-shrink: 0;
+  font-size: 12px;
+}
+
+.feed-kill .feed-text {
+  color: var(--text);
+}
+
+.feed-row:not(.feed-kill) .feed-text {
+  color: var(--dim);
+}
+
+.feed-win .feed-text,
+.feed-gm_action .feed-text {
+  color: var(--accent);
+}
+
+.gravestone {
+  text-align: center;
+  border-width: 2px;
+}
+
+.grave-rip {
+  font-size: 44px;
+  color: var(--dim);
+}
+
+.ring-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ring-row {
+  font-size: 14px;
+  line-height: 1.5;
+  border-bottom: 1px dashed var(--border);
+  padding-bottom: 8px;
+}
+
+.ring-row:last-child {
+  border-bottom: none;
+}
+
+.ring-hunter,
+.ring-target {
+  font-weight: 700;
+}
+
+/* Tabs (alive players: dossier / feed) */
+
+.tab-bar {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  max-width: 480px;
+  margin: 0 auto;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.tab {
+  flex: 1;
+  min-height: 56px;
+  background: none;
+  border: none;
+  color: var(--dim);
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: 0.14em;
+}
+
+.tab.active {
+  color: var(--accent);
+  box-shadow: inset 0 3px 0 var(--accent);
+}
+
+/* Content above a tab bar needs clearance so the sticky bar can't cover
+   the last line before full scroll */
+
+.with-tabs .screen {
+  padding-bottom: calc(88px + env(safe-area-inset-bottom));
+  min-height: calc(100svh - 56px);
+}
+
+/* Banners share one sticky container so they stack instead of overlap */
+
+.banners {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+/* Notice banner (e.g. tangled kill — survives screen changes) */
+
+.notice-banner {
+  background: var(--surface-raised);
+  border-bottom: 2px solid var(--accent);
+  color: var(--text);
+  padding: 12px 14px;
+  font-size: 13px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.notice-dismiss {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--dim);
+  min-width: 44px;
+  min-height: 44px;
+  font-size: 16px;
+}
+
+/* GM panel */
+
+.gm-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-bottom: 1px dashed var(--border);
+  padding-bottom: 12px;
+}
+
+.gm-row:last-child {
+  border-bottom: none;
+}
+
+.gm-btn-row {
+  display: flex;
+  gap: 10px;
+}
+
+.gm-btn-row .ghost-btn {
+  flex: 1;
+}
+
+.ghost-btn.danger {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Armed (tap-again-to-confirm) state */
+
+.primary-btn.armed,
+.ghost-btn.armed {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  animation: arm-pulse 1s ease-in-out infinite alternate;
+}
+
+@keyframes arm-pulse {
+  from { opacity: 1; }
+  to { opacity: 0.75; }
+}
+
+/* PIN masking without type=password (which triggers iOS keychain UI) */
+
+.pin-mask {
+  -webkit-text-security: disc;
+  letter-spacing: 0.4em;
+}
+
+/* Offline banner */
+
+.offline-banner {
+  background: var(--accent);
+  color: #fff;
+  text-align: center;
+  padding: 10px 12px;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
