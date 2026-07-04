@@ -12,6 +12,7 @@ import {
   getDoc,
   runTransaction,
   serverTimestamp,
+  updateDoc,
 } from 'firebase/firestore'
 import { db } from './firebase'
 import { GAME_ID, GM_NAME, JOIN_CODE, LOCATIONS, OBJECTS } from './gameConfig'
@@ -49,6 +50,10 @@ function deal(list, n) {
   const out = []
   while (out.length < n) out.push(...shuffled(list))
   return out.slice(0, n)
+}
+
+function randomFrom(list) {
+  return list[Math.floor(Math.random() * list.length)]
 }
 
 // Join: claim a roster name and create the player doc. Runs in a transaction
@@ -157,4 +162,111 @@ export async function startGame({ players }) {
     tx.update(gameRef(), { status: 'active', startedAt: serverTimestamp() })
   })
   postEvent('start', 'The game is afoot.')
+}
+
+// Kill handshake, step 1 (assassin): flag the target's player doc. Their
+// phone is already listening and flips to the confirm screen. The object
+// and location ride along so the victim's phone can write the feed line —
+// it cannot read the assassin's mission doc.
+export async function reportKill({ assassinUid, targetId, object, location }) {
+  await updateDoc(playerRef(targetId), {
+    pendingKillFrom: assassinUid,
+    pendingKillObject: object,
+    pendingKillLocation: location,
+    pendingKillAt: serverTimestamp(),
+  })
+}
+
+// Kill handshake, step 2 (victim confirms — deliberately victim-driven:
+// assassins have every incentive to lie, victims none). One transaction:
+// victim dies, assassin scores and inherits the victim's target with a
+// fresh object and location. If the inherited target IS the assassin, the
+// ring has closed and they are the last one standing. Simultaneous kills
+// serialise here: the second transaction retries against the new state.
+//
+// Returns 'died' | 'won' | 'assassin_dead' (kill can't stand, GM to
+// adjudicate — that path clears the pending flag but changes nothing else).
+export async function confirmDeath({ victimUid }) {
+  let outcome = null
+  let feed = []
+  await runTransaction(db, async (tx) => {
+    outcome = null
+    feed = []
+    // All reads first: the client SDK forbids reads after writes.
+    const gameSnap = await tx.get(gameRef())
+    if (gameSnap.data()?.status !== 'active') {
+      throw new Error('The game is not live.')
+    }
+    const victimSnap = await tx.get(playerRef(victimUid))
+    const victim = victimSnap.data()
+    if (!victim || victim.status !== 'alive') {
+      throw new Error("You're already dead.")
+    }
+    const assassinUid = victim.pendingKillFrom
+    if (!assassinUid) {
+      throw new Error('No pending kill to confirm.')
+    }
+    const assassinSnap = await tx.get(playerRef(assassinUid))
+    const assassin = assassinSnap.data()
+    const clearPending = {
+      pendingKillFrom: null,
+      pendingKillObject: null,
+      pendingKillLocation: null,
+      pendingKillAt: null,
+    }
+    if (!assassin || assassin.status !== 'alive') {
+      // Assassin was eliminated between report and confirm. The kill can't
+      // resolve cleanly (their own killer already inherited a target), so
+      // clear the flag and send both to the GM.
+      tx.update(playerRef(victimUid), clearPending)
+      outcome = 'assassin_dead'
+      feed = [
+        ['gm_action', `${victim.name}'s elimination is tangled — the assassin fell first. Game Master to adjudicate.`],
+      ]
+      return
+    }
+    const victimMissionSnap = await tx.get(missionRef(victimUid))
+    const inheritedTargetId = victimMissionSnap.data()?.targetId ?? null
+
+    tx.update(playerRef(victimUid), {
+      ...clearPending,
+      status: 'dead',
+      killedBy: assassinUid,
+      diedAt: serverTimestamp(),
+    })
+    tx.update(playerRef(assassinUid), { kills: (assassin.kills ?? 0) + 1 })
+    feed = [
+      ['kill', `${victim.name} was eliminated ${victim.pendingKillLocation ?? 'somewhere'} with ${victim.pendingKillObject ?? 'something'}`],
+    ]
+    if (!inheritedTargetId || inheritedTargetId === assassinUid) {
+      // Ring closed: the assassin inherits themselves. Last one standing.
+      tx.update(gameRef(), { status: 'finished', winnerId: assassinUid })
+      outcome = 'won'
+      feed.push(['win', `${assassin.name} is the last assassin standing.`])
+    } else {
+      tx.set(missionRef(assassinUid), {
+        targetId: inheritedTargetId,
+        object: randomFrom(OBJECTS),
+        location: randomFrom(LOCATIONS),
+        assignedAt: serverTimestamp(),
+      })
+      outcome = 'died'
+    }
+  })
+  feed.forEach(([type, text]) => postEvent(type, text))
+  return outcome
+}
+
+// Kill handshake, dispute branch: clear the flag, point both at the GM.
+export async function disputeKill({ victimUid, victimName }) {
+  await updateDoc(playerRef(victimUid), {
+    pendingKillFrom: null,
+    pendingKillObject: null,
+    pendingKillLocation: null,
+    pendingKillAt: null,
+  })
+  postEvent(
+    'gm_action',
+    `${victimName} disputes their elimination — Game Master to adjudicate.`,
+  )
 }

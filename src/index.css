@@ -337,6 +337,14 @@ button {
   font-size: 14px;
 }
 
+.death-question {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 28px;
+  letter-spacing: 0.1em;
+  text-align: center;
+}
+
 .ghost-btn {
   min-height: 52px;
   width: 100%;

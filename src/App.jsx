@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { collection, doc, onSnapshot } from 'firebase/firestore'
 import { db, ensureSignedIn, isConfigured } from './firebase'
 import { GAME_ID, ROSTER } from './gameConfig'
+import DeathConfirmScreen from './screens/DeathConfirmScreen'
 import JoinScreen from './screens/JoinScreen'
 import LobbyScreen from './screens/LobbyScreen'
 import MissionScreen from './screens/MissionScreen'
@@ -40,6 +41,21 @@ function devPreview() {
         mission={{ targetId: 'fake-2', object: 'a rubber duck', location: 'at the bar' }}
         players={fakePlayers}
         checkPin={(pin) => pin === '1234'}
+      />
+    )
+  }
+  if (which === 'confirm') {
+    return (
+      <DeathConfirmScreen
+        me={{
+          ...fakePlayers[1],
+          pendingKillFrom: 'fake-0',
+          pendingKillObject: 'a teabag',
+          pendingKillLocation: 'in the smoking area',
+        }}
+        players={fakePlayers}
+        onConfirm={async () => 'died'}
+        onDispute={async () => {}}
       />
     )
   }
@@ -111,12 +127,15 @@ export default function App() {
   } else if (!me) {
     screen = <JoinScreen uid={uid} game={game} players={players} />
   } else if (game?.status === 'active') {
-    screen =
-      me.status === 'alive' ? (
+    if (me.status !== 'alive') {
+      screen = <DeadPlaceholder me={me} />
+    } else if (me.pendingKillFrom) {
+      screen = <DeathConfirmScreen me={me} players={players} />
+    } else {
+      screen = (
         <MissionScreen uid={uid} me={me} mission={mission} players={players} />
-      ) : (
-        <DeadPlaceholder me={me} />
       )
+    }
   } else if (game?.status === 'finished') {
     screen = <FinishedPlaceholder />
   } else {

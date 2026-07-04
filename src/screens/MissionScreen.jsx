@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { verifyPin } from '../game'
+import { reportKill, verifyPin } from '../game'
 
 // The heart of the app: a PIN-gated dossier. Locks itself again whenever the
 // page is hidden (pocket, app switch, mate grabbing the phone mid-pint).
@@ -24,6 +24,35 @@ export default function MissionScreen({ uid, me, mission, players, checkPin }) {
   const target = mission
     ? players.find((p) => p.id === mission.targetId)
     : null
+  // Our report is pending until the target confirms (their doc carries the
+  // flag, and everyone can read player docs).
+  const awaitingConfirm = Boolean(target && target.pendingKillFrom === uid)
+  const [reportError, setReportError] = useState(null)
+  const [reporting, setReporting] = useState(false)
+
+  async function handleReportKill() {
+    if (
+      !window.confirm(
+        `Report the kill on ${target.name}? Only report once their hand has closed on ${mission.object} ${mission.location}.`,
+      )
+    ) {
+      return
+    }
+    setReportError(null)
+    setReporting(true)
+    try {
+      await reportKill({
+        assassinUid: uid,
+        targetId: target.id,
+        object: mission.object,
+        location: mission.location,
+      })
+      // Their phone now shows the confirm screen; ours shows "awaiting".
+    } catch (err) {
+      setReportError(err.message)
+    }
+    setReporting(false)
+  }
 
   async function handleUnseal() {
     setError(null)
@@ -117,12 +146,24 @@ export default function MissionScreen({ uid, me, mission, players, checkPin }) {
           you at the location. Refusal is no kill.
         </p>
 
+        {awaitingConfirm && (
+          <p className="final-two mono">
+            Kill reported. Waiting for {target?.name} to confirm on their
+            phone. If theirs is dead (the phone), get the Game Master.
+          </p>
+        )}
+        {reportError && <p className="error mono">{reportError}</p>}
         <button
           type="button"
           className="primary-btn"
-          onClick={() => alert('The kill handshake lands in the next build stage.')}
+          disabled={!target || awaitingConfirm || reporting}
+          onClick={handleReportKill}
         >
-          REPORT KILL
+          {awaitingConfirm
+            ? 'AWAITING CONFIRMATION'
+            : reporting
+              ? 'REPORTING…'
+              : 'REPORT KILL'}
         </button>
         <button
           type="button"
