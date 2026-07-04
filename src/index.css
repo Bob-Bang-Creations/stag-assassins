@@ -535,6 +535,34 @@ button {
   font-size: 16px;
 }
 
+/* GM panel */
+
+.gm-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-bottom: 1px dashed var(--border);
+  padding-bottom: 12px;
+}
+
+.gm-row:last-child {
+  border-bottom: none;
+}
+
+.gm-btn-row {
+  display: flex;
+  gap: 10px;
+}
+
+.gm-btn-row .ghost-btn {
+  flex: 1;
+}
+
+.ghost-btn.danger {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 /* PIN masking without type=password (which triggers iOS keychain UI) */
 
 .pin-mask {

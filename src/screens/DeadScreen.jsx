@@ -29,9 +29,9 @@ export default function DeadScreen({ me, players, events, loadRing }) {
         <p className="grave-rip">✝</p>
         <p className="death-question">{me.name}</p>
         <p className="mono dim centered-text">
-          Taken {me.diedWhere ?? 'somewhere'}
-          {killer ? ` by ${killer.name}` : ''}
-          {me.diedWith ? ` with ${me.diedWith}` : ''}.
+          {me.fled
+            ? 'Fled the city.'
+            : `Taken ${me.diedWhere ?? 'somewhere'}${killer ? ` by ${killer.name}` : ''}${me.diedWith ? ` with ${me.diedWith}` : ''}.`}
           {me.kills > 0
             ? ` Went down swinging: ${me.kills} kill${me.kills > 1 ? 's' : ''}.`
             : ''}

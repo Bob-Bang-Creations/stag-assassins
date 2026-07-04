@@ -136,6 +136,16 @@ service cloud.firestore {
         allow read: if signedIn();
         allow create: if isPlayer();
       }
+
+      // Phone-switch recovery: a new device posts a request under its own
+      // uid; the GM approves (which migrates the player) or deletes it.
+      match /reclaims/{uid} {
+        allow read: if signedIn();
+        allow create, update: if signedIn()
+          && request.auth.uid == uid
+          && codeOk(request.resource.data);
+        allow delete: if isGM();
+      }
     }
   }
 }

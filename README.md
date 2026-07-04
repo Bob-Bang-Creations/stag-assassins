@@ -69,4 +69,5 @@ Implemented in order, per the development plan:
 3. ✅ Mission card
 4. ✅ Kill handshake transaction
 5. ✅ Kill feed, graveyard, dead spectator view, winner screen
-6. ⬜ GM panel
+6. ✅ GM panel (force-confirm, remove player, reroll, end game, pressure
+   taunt, phone re-link recovery)

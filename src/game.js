@@ -12,6 +12,7 @@ import {
   getDoc,
   runTransaction,
   serverTimestamp,
+  setDoc,
 } from 'firebase/firestore'
 import { db } from './firebase'
 import { GAME_ID, GM_NAME, JOIN_CODE, LOCATIONS, OBJECTS } from './gameConfig'
@@ -24,6 +25,7 @@ export const secretsRef = (uid) =>
   doc(db, 'games', GAME_ID, 'players', uid, 'private', 'secrets')
 export const nameRef = (name) => doc(db, 'games', GAME_ID, 'names', name)
 export const eventsCol = () => collection(db, 'games', GAME_ID, 'events')
+export const reclaimRef = (uid) => doc(db, 'games', GAME_ID, 'reclaims', uid)
 
 // Fire-and-forget: the feed is nice-to-have. Never let a failed feed write
 // make a completed action look failed.
@@ -121,6 +123,175 @@ export async function joinGame({ uid, name, pin, code }) {
     tx.set(secretsRef(uid), { pin })
   })
   postEvent('join', `${name} has entered the game`)
+}
+
+// ---------------------------------------------------------------------------
+// GM tools. All guarded by rules (isGM = the locked gmUid on the game doc);
+// the UI additionally PIN-gates the panel with the GM's own PIN.
+
+// Recovery: a player on a new phone (dead battery, cleared Safari, private
+// browsing) posts a reclaim request; the GM approves and their whole
+// identity — player doc, mission, PIN — migrates to the new uid.
+export async function requestReclaim({ uid, name, code }) {
+  if (code.trim().toUpperCase() !== JOIN_CODE.toUpperCase()) {
+    throw new Error('Wrong join code. Check the card.')
+  }
+  await setDoc(reclaimRef(uid), {
+    name,
+    joinCode: JOIN_CODE,
+    at: serverTimestamp(),
+  })
+}
+
+export async function gmApproveReclaim({ newUid }) {
+  let playerName
+  await runTransaction(db, async (tx) => {
+    const reclaimSnap = await tx.get(reclaimRef(newUid))
+    if (!reclaimSnap.exists()) throw new Error('Request vanished.')
+    const name = reclaimSnap.data().name
+    playerName = name
+    const nameSnap = await tx.get(nameRef(name))
+    if (!nameSnap.exists()) throw new Error(`No claim on ${name} to move.`)
+    const oldUid = nameSnap.data().uid
+    if (oldUid === newUid) {
+      tx.delete(reclaimRef(newUid))
+      return
+    }
+    const oldPlayerSnap = await tx.get(playerRef(oldUid))
+    if (!oldPlayerSnap.exists()) {
+      throw new Error(`${name} has no player doc — have them join normally.`)
+    }
+    const [oldMissionSnap, oldSecretsSnap] = [
+      await tx.get(missionRef(oldUid)),
+      await tx.get(secretsRef(oldUid)),
+    ]
+    tx.set(playerRef(newUid), oldPlayerSnap.data())
+    if (oldMissionSnap.exists()) tx.set(missionRef(newUid), oldMissionSnap.data())
+    if (oldSecretsSnap.exists()) tx.set(secretsRef(newUid), oldSecretsSnap.data())
+    tx.update(nameRef(name), { uid: newUid })
+    tx.delete(missionRef(oldUid))
+    tx.delete(secretsRef(oldUid))
+    tx.delete(playerRef(oldUid))
+    tx.delete(reclaimRef(newUid))
+  })
+  postEvent('gm_action', `${playerName} has switched phones — re-linked by the GM.`)
+}
+
+// Remove a player who went home / stopped playing. The ring heals itself:
+// their assassin inherits their target (keeping the assassin's current
+// object and location). assassinUid comes from the GM's ring view and is
+// re-verified inside the transaction.
+export async function gmRemovePlayer({ removedUid, assassinUid }) {
+  let outcome = null
+  let feedLines = []
+  await runTransaction(db, async (tx) => {
+    outcome = null
+    feedLines = []
+    const gameSnap = await tx.get(gameRef())
+    if (gameSnap.data()?.status !== 'active') {
+      throw new Error('The game is not live.')
+    }
+    const removedSnap = await tx.get(playerRef(removedUid))
+    const removed = removedSnap.data()
+    if (!removed || removed.status !== 'alive') {
+      throw new Error('Already out of the game.')
+    }
+    const assassinMissionSnap = await tx.get(missionRef(assassinUid))
+    if (assassinMissionSnap.data()?.targetId !== removedUid) {
+      throw new Error('The ring has shifted — reopen the panel and retry.')
+    }
+    const assassinSnap = await tx.get(playerRef(assassinUid))
+    const assassin = assassinSnap.data()
+    if (!assassin || assassin.status !== 'alive') {
+      throw new Error('Their assassin is dead — the ring has shifted. Retry.')
+    }
+    const removedMissionSnap = await tx.get(missionRef(removedUid))
+    const inheritedTargetId = removedMissionSnap.data()?.targetId ?? null
+    // If the removed player had a live report out on their own target,
+    // clear it — the reporter is leaving the game.
+    let staleReportTarget = null
+    if (inheritedTargetId && inheritedTargetId !== assassinUid) {
+      const targetSnap = await tx.get(playerRef(inheritedTargetId))
+      if (targetSnap.data()?.pendingKillFrom === removedUid) {
+        staleReportTarget = inheritedTargetId
+      }
+    }
+
+    tx.update(playerRef(removedUid), {
+      status: 'dead',
+      fled: true,
+      killedBy: null,
+      diedAt: serverTimestamp(),
+      diedWhere: null,
+      diedWith: null,
+      pendingKillFrom: null,
+      pendingKillObject: null,
+      pendingKillLocation: null,
+      pendingKillAt: null,
+    })
+    if (staleReportTarget) {
+      tx.update(playerRef(staleReportTarget), {
+        pendingKillFrom: null,
+        pendingKillObject: null,
+        pendingKillLocation: null,
+        pendingKillAt: null,
+      })
+    }
+    feedLines = [['gm_action', `${removed.name} has fled the city.`]]
+    if (!inheritedTargetId || inheritedTargetId === assassinUid) {
+      tx.update(gameRef(), { status: 'finished', winnerId: assassinUid })
+      outcome = 'won'
+      feedLines.push(['win', `${assassin.name} is the last assassin standing.`])
+    } else {
+      tx.set(
+        missionRef(assassinUid),
+        { targetId: inheritedTargetId, assignedAt: serverTimestamp() },
+        { merge: true },
+      )
+      outcome = 'removed'
+    }
+  })
+  feedLines.forEach(([type, text]) => postEvent(type, text))
+  return outcome
+}
+
+// Reroll a struggling player's object and/or location (target unchanged).
+export async function gmRerollMission({ playerUid, playerName }) {
+  await runTransaction(db, async (tx) => {
+    const missionSnap = await tx.get(missionRef(playerUid))
+    if (!missionSnap.exists()) throw new Error('No mission to reroll.')
+    tx.set(
+      missionRef(playerUid),
+      {
+        object: randomFrom(OBJECTS),
+        location: randomFrom(LOCATIONS),
+        assignedAt: serverTimestamp(),
+      },
+      { merge: true },
+    )
+  })
+  postEvent('gm_action', `Fresh orders issued to ${playerName}.`)
+}
+
+// The whistle: end the game and crown the survivor with the most kills
+// (GM picks — the app pre-sorts, the GM's word is final).
+export async function gmEndGame({ winnerUid, winnerName }) {
+  await runTransaction(db, async (tx) => {
+    const gameSnap = await tx.get(gameRef())
+    if (gameSnap.data()?.status !== 'active') {
+      throw new Error('The game is not live.')
+    }
+    tx.update(gameRef(), { status: 'finished', winnerId: winnerUid })
+  })
+  postEvent('win', `Full time. ${winnerName} takes it.`)
+}
+
+// Feed taunt to shake a stalled game loose.
+export function gmPressure(names) {
+  postEvent(
+    'gm_action',
+    `The city grows restless. All eyes on ${names.join(' and ')}.`,
+  )
 }
 
 // Spectator ring reveal: dead players (and anyone once the game finishes)

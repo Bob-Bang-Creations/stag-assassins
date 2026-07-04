@@ -12,6 +12,7 @@ import { GAME_ID, ROSTER } from './gameConfig'
 import DeadScreen from './screens/DeadScreen'
 import DeathConfirmScreen from './screens/DeathConfirmScreen'
 import FeedScreen from './screens/FeedScreen'
+import GMScreen from './screens/GMScreen'
 import JoinScreen from './screens/JoinScreen'
 import LobbyScreen from './screens/LobbyScreen'
 import MissionScreen from './screens/MissionScreen'
@@ -54,7 +55,30 @@ function devPreview() {
     return <JoinScreen uid="preview" game={fakeGame} players={fakePlayers} />
   }
   if (which === 'lobby') {
-    return <LobbyScreen me={fakePlayers[0]} isGM players={fakePlayers} />
+    return (
+      <LobbyScreen me={fakePlayers[0]} isGM players={fakePlayers} reclaims={[]} />
+    )
+  }
+  if (which === 'gm') {
+    return (
+      <GMScreen
+        uid="fake-0"
+        me={fakePlayers[0]}
+        players={fakePlayers.map((p, i) =>
+          i === 1
+            ? {
+                ...p,
+                pendingKillFrom: 'fake-0',
+                pendingKillObject: 'a rubber duck',
+                pendingKillLocation: 'at the bar',
+              }
+            : p,
+        )}
+        reclaims={[{ id: 'new-uid-1', name: 'Liam' }]}
+        checkPin={(pin) => pin === '1234'}
+        loadRing={async () => fakeRing}
+      />
+    )
   }
   if (which === 'mission') {
     return (
@@ -117,7 +141,8 @@ export default function App() {
   const [players, setPlayers] = useState([])
   const [mission, setMission] = useState(null)
   const [events, setEvents] = useState([])
-  const [tab, setTab] = useState('mission') // 'mission' | 'feed'
+  const [reclaims, setReclaims] = useState([])
+  const [tab, setTab] = useState('main') // 'main' | 'feed' | 'gm'
   const [notice, setNotice] = useState(null)
 
   useEffect(() => {
@@ -156,6 +181,18 @@ export default function App() {
     return () => unsubs.forEach((unsub) => unsub())
   }, [uid])
 
+  // Phone-switch requests: only the GM acts on them.
+  const gmUid = game?.gmUid
+  useEffect(() => {
+    if (!uid || gmUid !== uid) {
+      setReclaims([])
+      return undefined
+    }
+    return onSnapshot(collection(db, 'games', GAME_ID, 'reclaims'), (snap) =>
+      setReclaims(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+    )
+  }, [uid, gmUid])
+
   // Own mission: only exists (and is only readable) once the game is live.
   const gameActive = game?.status === 'active'
   useEffect(() => {
@@ -187,44 +224,56 @@ export default function App() {
   } else if (!me) {
     screen = <JoinScreen uid={uid} game={game} players={players} />
   } else if (game?.status === 'active') {
-    if (me.status !== 'alive') {
-      screen = <DeadScreen me={me} players={players} events={events} />
-    } else if (me.pendingKillFrom) {
+    if (me.status === 'alive' && me.pendingKillFrom) {
       screen = (
         <DeathConfirmScreen me={me} players={players} onNotice={setNotice} />
       )
+    } else if (me.status !== 'alive' && !isGM) {
+      screen = <DeadScreen me={me} players={players} events={events} />
     } else {
+      // Alive players get DOSSIER/FEED; the GM gets a third tab (and keeps
+      // the panel even if they die — the organiser's word outlives them).
+      const tabDefs = [
+        { key: 'main', label: me.status === 'alive' ? 'DOSSIER' : 'GRAVE' },
+        { key: 'feed', label: 'FEED' },
+        ...(isGM ? [{ key: 'gm', label: 'GM' }] : []),
+      ]
       tabs = (
         <nav className="tab-bar">
-          <button
-            type="button"
-            className={`tab ${tab === 'mission' ? 'active' : ''}`}
-            onClick={() => setTab('mission')}
-          >
-            DOSSIER
-          </button>
-          <button
-            type="button"
-            className={`tab ${tab === 'feed' ? 'active' : ''}`}
-            onClick={() => setTab('feed')}
-          >
-            FEED
-          </button>
+          {tabDefs.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              className={`tab ${tab === t.key ? 'active' : ''}`}
+              onClick={() => setTab(t.key)}
+            >
+              {t.label}
+            </button>
+          ))}
         </nav>
       )
-      screen =
-        tab === 'feed' ? (
-          <FeedScreen players={players} events={events} />
-        ) : (
+      if (tab === 'feed') {
+        screen = <FeedScreen players={players} events={events} />
+      } else if (tab === 'gm' && isGM) {
+        screen = (
+          <GMScreen uid={uid} me={me} players={players} reclaims={reclaims} />
+        )
+      } else if (me.status === 'alive') {
+        screen = (
           <MissionScreen uid={uid} me={me} mission={mission} players={players} />
         )
+      } else {
+        screen = <DeadScreen me={me} players={players} events={events} />
+      }
     }
   } else if (game?.status === 'finished') {
     screen = (
       <WinnerScreen me={me} game={game} players={players} events={events} />
     )
   } else {
-    screen = <LobbyScreen me={me} isGM={isGM} players={players} />
+    screen = (
+      <LobbyScreen me={me} isGM={isGM} players={players} reclaims={reclaims} />
+    )
   }
 
   return (

@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { startGame } from '../game'
+import { gmApproveReclaim, startGame } from '../game'
 import { JOIN_CODE, ROSTER } from '../gameConfig'
 
-export default function LobbyScreen({ me, isGM, players }) {
+export default function LobbyScreen({ me, isGM, players, reclaims = [] }) {
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
 
@@ -64,6 +64,34 @@ export default function LobbyScreen({ me, isGM, players }) {
               ? 'All agents present.'
               : `Still waiting on ${missing.join(', ')}.`}
           </p>
+          {reclaims.length > 0 && (
+            <>
+              <p className="field-label">PHONE-SWITCH REQUESTS</p>
+              {reclaims.map((r) => (
+                <div key={r.id} className="gm-row">
+                  <p className="mono">Someone claims to be {r.name} on a new phone.</p>
+                  <button
+                    type="button"
+                    className="ghost-btn"
+                    disabled={busy}
+                    onClick={async () => {
+                      if (!window.confirm(`Re-link ${r.name}? Check it's really them first.`)) return
+                      setError(null)
+                      setBusy(true)
+                      try {
+                        await gmApproveReclaim({ newUid: r.id })
+                      } catch (err) {
+                        setError(err.message)
+                      }
+                      setBusy(false)
+                    }}
+                  >
+                    APPROVE RE-LINK
+                  </button>
+                </div>
+              ))}
+            </>
+          )}
           {error && <p className="error mono">{error}</p>}
           <button
             type="button"
