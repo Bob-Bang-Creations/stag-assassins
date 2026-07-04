@@ -29,10 +29,16 @@ export default function WinnerScreen({ me, game, players, events }) {
           {players.map((p) => (
             <div
               key={p.id}
-              className={`grave-chip ${p.status === 'dead' ? 'dead' : 'winner'}`}
+              className={`grave-chip ${
+                p.status === 'dead'
+                  ? 'dead'
+                  : p.id === game.winnerId
+                    ? 'winner'
+                    : ''
+              }`}
             >
               <span className="grave-name">
-                {p.status === 'dead' ? '✝ ' : '★ '}
+                {p.status === 'dead' ? '✝ ' : p.id === game.winnerId ? '★ ' : ''}
                 {p.name}
               </span>
               <span className="mono dim grave-kills">

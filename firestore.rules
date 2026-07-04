@@ -110,10 +110,13 @@ service cloud.firestore {
                 || (docId == 'mission'
                     && (isDeadSpectator() || gameFinished())));
           // Own docs are writable during join (before the player doc
-          // exists); otherwise joined players (kill handshake writes the
-          // assassin's next mission) and the GM.
+          // exists) and by the GM. Cross-player writes are allowed for
+          // MISSIONS ONLY (the kill handshake writes the assassin's next
+          // mission) — never another player's PIN, or a hostile mate could
+          // overwrite it and then "know" it.
           allow write: if (signedIn() && request.auth.uid == playerId)
-                        || isPlayer() || isGM();
+                        || isGM()
+                        || (isPlayer() && docId == 'mission');
         }
       }
 

@@ -25,8 +25,15 @@ export default function DeathConfirmScreen({
   async function handleConfirm() {
     setError(null)
     setBusy(true)
+    let pinOk
     try {
-      const pinOk = await (checkPin ? checkPin(pin) : verifyPin(me.id, pin))
+      pinOk = await (checkPin ? checkPin(pin) : verifyPin(me.id, pin))
+    } catch {
+      setError('No signal — try again when you reconnect.')
+      setBusy(false)
+      return
+    }
+    try {
       if (!pinOk) {
         setError('Wrong PIN. Only the deceased may confirm their own death.')
         setBusy(false)

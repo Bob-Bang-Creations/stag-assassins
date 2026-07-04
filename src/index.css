@@ -495,12 +495,25 @@ button {
   box-shadow: inset 0 3px 0 var(--accent);
 }
 
-/* Notice banner (e.g. tangled kill — survives screen changes) */
+/* Content above a tab bar needs clearance so the sticky bar can't cover
+   the last line before full scroll */
 
-.notice-banner {
+.with-tabs .screen {
+  padding-bottom: calc(88px + env(safe-area-inset-bottom));
+  min-height: calc(100svh - 56px);
+}
+
+/* Banners share one sticky container so they stack instead of overlap */
+
+.banners {
   position: sticky;
   top: 0;
   z-index: 10;
+}
+
+/* Notice banner (e.g. tangled kill — survives screen changes) */
+
+.notice-banner {
   background: var(--surface-raised);
   border-bottom: 2px solid var(--accent);
   color: var(--text);
@@ -532,9 +545,6 @@ button {
 /* Offline banner */
 
 .offline-banner {
-  position: sticky;
-  top: 0;
-  z-index: 10;
   background: var(--accent);
   color: #fff;
   text-align: center;

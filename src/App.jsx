@@ -229,20 +229,22 @@ export default function App() {
 
   return (
     <>
-      <OfflineBanner />
-      {notice && (
-        <div className="notice-banner mono" role="status">
-          <span>{notice}</span>
-          <button
-            type="button"
-            className="notice-dismiss"
-            onClick={() => setNotice(null)}
-          >
-            ✕
-          </button>
-        </div>
-      )}
-      {screen}
+      <div className="banners">
+        <OfflineBanner />
+        {notice && (
+          <div className="notice-banner mono" role="status">
+            <span>{notice}</span>
+            <button
+              type="button"
+              className="notice-dismiss"
+              onClick={() => setNotice(null)}
+            >
+              ✕
+            </button>
+          </div>
+        )}
+      </div>
+      <div className={tabs ? 'with-tabs' : undefined}>{screen}</div>
       {tabs}
     </>
   )

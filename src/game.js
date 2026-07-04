@@ -264,6 +264,16 @@ export async function confirmDeath({ victimUid }) {
     }
     const victimMissionSnap = await tx.get(missionRef(victimUid))
     const inheritedTargetId = victimMissionSnap.data()?.targetId ?? null
+    if (!inheritedTargetId) {
+      // No mission on file (should never happen; a missing doc must NOT be
+      // mistaken for ring closure — that would be an instant premature win).
+      tx.update(playerRef(victimUid), clearPending)
+      outcome = 'assassin_dead'
+      feed = [
+        ['gm_action', `${victim.name}'s elimination is tangled — no mission on file. Game Master to adjudicate.`],
+      ]
+      return
+    }
 
     tx.update(playerRef(victimUid), {
       ...clearPending,
@@ -278,7 +288,7 @@ export async function confirmDeath({ victimUid }) {
     feed = [
       ['kill', `${victim.name} was eliminated ${victim.pendingKillLocation ?? 'somewhere'} with ${victim.pendingKillObject ?? 'something'}`],
     ]
-    if (!inheritedTargetId || inheritedTargetId === assassinUid) {
+    if (inheritedTargetId === assassinUid) {
       // Ring closed: the assassin inherits themselves. Last one standing.
       tx.update(gameRef(), { status: 'finished', winnerId: assassinUid })
       outcome = 'won'
@@ -299,7 +309,10 @@ export async function confirmDeath({ victimUid }) {
 
 // Kill handshake, dispute branch: clear the flag, point both at the GM.
 // Transactional so a dispute racing a confirm can't post a misleading
-// "disputes their elimination" line after the death already stood.
+// "disputes their elimination" line after the death already stood. The
+// report showed the victim their assassin's object and location, so the
+// assassin gets fresh ones — otherwise the victim could dodge that combo
+// all night.
 export async function disputeKill({ victimUid, victimName }) {
   let cleared = false
   await runTransaction(db, async (tx) => {
@@ -309,12 +322,24 @@ export async function disputeKill({ victimUid, victimName }) {
     if (!victim || victim.status !== 'alive' || !victim.pendingKillFrom) {
       return // nothing to dispute (already resolved)
     }
+    const assassinMissionSnap = await tx.get(missionRef(victim.pendingKillFrom))
     tx.update(playerRef(victimUid), {
       pendingKillFrom: null,
       pendingKillObject: null,
       pendingKillLocation: null,
       pendingKillAt: null,
     })
+    if (assassinMissionSnap.exists()) {
+      tx.set(
+        missionRef(victim.pendingKillFrom),
+        {
+          object: randomFrom(OBJECTS),
+          location: randomFrom(LOCATIONS),
+          assignedAt: serverTimestamp(),
+        },
+        { merge: true },
+      )
+    }
     cleared = true
   })
   if (cleared) {
