@@ -56,9 +56,14 @@ identity on close).
   never changed — it can't be seized from a browser console.
 - Transactions (join, start, kill handshake) need signal; plain reads and
   the feed keep working offline. The app shows a NO SIGNAL banner.
-- If someone switches phones or clears their browser data, their name stays
-  claimed by the old identity — the GM re-link tool (GM panel stage) is the
-  recovery path.
+- If someone switches phones or clears their browser data, they request a
+  re-link from the join screen and the GM approves it from the panel (verify
+  it's really them in person — the app can't).
+- Two break-glass caveats for the organiser: the GM identity itself cannot
+  be re-linked in-app (the GM lock is deliberately permanent — keep that
+  phone alive, or edit `gmUid` on the game doc in the Firebase console),
+  and if the GM is a victim whose own phone dies, nobody can force-confirm
+  that kill (the GM should die honestly).
 
 ## Build stages
 
@@ -71,3 +76,11 @@ Implemented in order, per the development plan:
 5. ✅ Kill feed, graveyard, dead spectator view, winner screen
 6. ✅ GM panel (force-confirm, remove player, reroll, end game, pressure
    taunt, phone re-link recovery)
+7. ✅ PWA (manifest, icons, Add to Home Screen) + GitHub Pages deploy
+
+## Deploy
+
+Merge to `main` and the deploy workflow publishes to GitHub Pages
+(one-time: repo Settings → Pages → Source → "GitHub Actions"). The app URL
+will be `https://<owner>.github.io/stag-assassins/` — generate a QR code
+for it and drop it in the group chat on the Friday.

@@ -563,6 +563,21 @@ button {
   color: var(--accent);
 }
 
+/* Armed (tap-again-to-confirm) state */
+
+.primary-btn.armed,
+.ghost-btn.armed {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  animation: arm-pulse 1s ease-in-out infinite alternate;
+}
+
+@keyframes arm-pulse {
+  from { opacity: 1; }
+  to { opacity: 0.75; }
+}
+
 /* PIN masking without type=password (which triggers iOS keychain UI) */
 
 .pin-mask {

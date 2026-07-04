@@ -36,7 +36,7 @@ export function postEvent(type, text) {
 }
 
 // Fisher-Yates.
-function shuffled(list) {
+export function shuffled(list) {
   const copy = [...list]
   for (let i = copy.length - 1; i > 0; i -= 1) {
     const j = Math.floor(Math.random() * (i + 1))
@@ -143,38 +143,98 @@ export async function requestReclaim({ uid, name, code }) {
   })
 }
 
-export async function gmApproveReclaim({ newUid }) {
-  let playerName
+export async function gmApproveReclaim({ newUid, players = [], reclaims = [] }) {
+  let migratedName = null
   await runTransaction(db, async (tx) => {
+    migratedName = null
+    // --- reads (all before the first write; the SDK requires it) ---
     const reclaimSnap = await tx.get(reclaimRef(newUid))
     if (!reclaimSnap.exists()) throw new Error('Request vanished.')
     const name = reclaimSnap.data().name
-    playerName = name
     const nameSnap = await tx.get(nameRef(name))
     if (!nameSnap.exists()) throw new Error(`No claim on ${name} to move.`)
     const oldUid = nameSnap.data().uid
     if (oldUid === newUid) {
+      // Already linked — just clear the stale request (no feed line).
       tx.delete(reclaimRef(newUid))
       return
+    }
+    const gameSnap = await tx.get(gameRef())
+    if (gameSnap.data()?.gmUid === oldUid) {
+      throw new Error(
+        "That's the GM identity — it can't move in-app (the GM lock is " +
+          'deliberately permanent). Keep the old phone, or edit gmUid in ' +
+          'the Firebase console as a last resort.',
+      )
+    }
+    const newPlayerSnap = await tx.get(playerRef(newUid))
+    if (newPlayerSnap.exists()) {
+      throw new Error(
+        `That phone is already in the game as ${newPlayerSnap.data().name}.`,
+      )
     }
     const oldPlayerSnap = await tx.get(playerRef(oldUid))
     if (!oldPlayerSnap.exists()) {
       throw new Error(`${name} has no player doc — have them join normally.`)
     }
-    const [oldMissionSnap, oldSecretsSnap] = [
-      await tx.get(missionRef(oldUid)),
-      await tx.get(secretsRef(oldUid)),
-    ]
+    const oldMissionSnap = await tx.get(missionRef(oldUid))
+    const oldSecretsSnap = await tx.get(secretsRef(oldUid))
+
+    // Ring rewiring: whoever hunts the old uid must hunt the new one, and
+    // an outstanding report BY the old uid must follow them too — otherwise
+    // the hunter is left aiming at a deleted doc (soft-locked out).
+    const active = gameSnap.data()?.status === 'active'
+    let hunterUid = null
+    let staleReportTargetUid = null
+    if (active) {
+      const others = players.filter(
+        (p) => p.status === 'alive' && p.id !== oldUid && p.id !== newUid,
+      )
+      const missionSnaps = await Promise.all(
+        others.map((p) => tx.get(missionRef(p.id))),
+      )
+      missionSnaps.forEach((snap, i) => {
+        if (snap.exists() && snap.data().targetId === oldUid) {
+          hunterUid = others[i].id
+        }
+      })
+      const oldTargetId = oldMissionSnap.data()?.targetId
+      if (oldTargetId && oldTargetId !== newUid) {
+        const targetSnap = await tx.get(playerRef(oldTargetId))
+        if (targetSnap.data()?.pendingKillFrom === oldUid) {
+          staleReportTargetUid = oldTargetId
+        }
+      }
+    }
+
+    // --- writes ---
     tx.set(playerRef(newUid), oldPlayerSnap.data())
     if (oldMissionSnap.exists()) tx.set(missionRef(newUid), oldMissionSnap.data())
     if (oldSecretsSnap.exists()) tx.set(secretsRef(newUid), oldSecretsSnap.data())
+    if (hunterUid) {
+      tx.set(missionRef(hunterUid), { targetId: newUid }, { merge: true })
+    }
+    if (staleReportTargetUid) {
+      tx.update(playerRef(staleReportTargetUid), { pendingKillFrom: newUid })
+    }
     tx.update(nameRef(name), { uid: newUid })
     tx.delete(missionRef(oldUid))
     tx.delete(secretsRef(oldUid))
     tx.delete(playerRef(oldUid))
     tx.delete(reclaimRef(newUid))
+    // Clear duplicate requests for the same name so a stale one can't be
+    // approved later and migrate the identity again.
+    reclaims
+      .filter((r) => r.name === name && r.id !== newUid)
+      .forEach((r) => tx.delete(reclaimRef(r.id)))
+    migratedName = name
   })
-  postEvent('gm_action', `${playerName} has switched phones — re-linked by the GM.`)
+  if (migratedName) {
+    postEvent(
+      'gm_action',
+      `${migratedName} has switched phones — re-linked by the GM.`,
+    )
+  }
 }
 
 // Remove a player who went home / stopped playing. The ring heals itself:
@@ -207,6 +267,13 @@ export async function gmRemovePlayer({ removedUid, assassinUid }) {
     }
     const removedMissionSnap = await tx.get(missionRef(removedUid))
     const inheritedTargetId = removedMissionSnap.data()?.targetId ?? null
+    if (!inheritedTargetId) {
+      // A missing mission must never be mistaken for ring closure (that
+      // would be an instant premature win) — same guard as confirmDeath.
+      throw new Error(
+        `No mission on file for ${removed.name} — adjudicate by hand.`,
+      )
+    }
     // If the removed player had a live report out on their own target,
     // clear it — the reporter is leaving the game.
     let staleReportTarget = null
@@ -238,7 +305,7 @@ export async function gmRemovePlayer({ removedUid, assassinUid }) {
       })
     }
     feedLines = [['gm_action', `${removed.name} has fled the city.`]]
-    if (!inheritedTargetId || inheritedTargetId === assassinUid) {
+    if (inheritedTargetId === assassinUid) {
       tx.update(gameRef(), { status: 'finished', winnerId: assassinUid })
       outcome = 'won'
       feedLines.push(['win', `${assassin.name} is the last assassin standing.`])
@@ -340,6 +407,16 @@ export async function startGame({ players }) {
     }
     if (players.length < 2) {
       throw new Error('Need at least two assassins.')
+    }
+    // A re-link approved seconds ago can leave the GM's snapshot listing a
+    // deleted uid — never deal a mission to a ghost.
+    const playerSnaps = await Promise.all(
+      players.map((p) => tx.get(playerRef(p.id))),
+    )
+    if (playerSnaps.some((snap) => !snap.exists())) {
+      throw new Error(
+        'The roster shifted a moment ago — check the lobby and start again.',
+      )
     }
     const ring = shuffled(players.map((p) => p.id))
     const objects = deal(OBJECTS, ring.length)

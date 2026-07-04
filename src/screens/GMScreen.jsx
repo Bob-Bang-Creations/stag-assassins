@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import ArmedButton from '../components/ArmedButton'
 import {
   confirmDeath,
   fetchRing,
@@ -7,6 +8,7 @@ import {
   gmPressure,
   gmRemovePlayer,
   gmRerollMission,
+  shuffled,
   verifyPin,
 } from '../game'
 
@@ -132,18 +134,15 @@ export default function GMScreen({ uid, me, players, reclaims, checkPin, loadRin
                   {reporter?.name ?? '?'} claims {v.name} ·{' '}
                   {v.pendingKillObject} · {v.pendingKillLocation}
                 </p>
-                <button
-                  type="button"
+                <ArmedButton
                   className="ghost-btn danger"
                   disabled={busy}
-                  onClick={() => {
-                    if (window.confirm(`Force-confirm ${v.name}'s death? Use when their phone is dead or they refuse.`)) {
-                      run('Force confirm', () => confirmDeath({ victimUid: v.id }))
-                    }
-                  }}
-                >
-                  FORCE CONFIRM DEATH
-                </button>
+                  label="FORCE CONFIRM DEATH"
+                  armedLabel={`KILL ${v.name.toUpperCase()}? TAP AGAIN`}
+                  onFire={() =>
+                    run('Force confirm', () => confirmDeath({ victimUid: v.id }))
+                  }
+                />
               </div>
             )
           })}
@@ -156,20 +155,30 @@ export default function GMScreen({ uid, me, players, reclaims, checkPin, loadRin
           {reclaims.map((r) => (
             <div key={r.id} className="gm-row">
               <p className="mono">
-                Someone claims to be {r.name} on a new phone.
+                Someone claims to be {r.name} on a new phone{' '}
+                <span className="dim">
+                  (device …{r.id.slice(-4)}
+                  {r.at?.toDate
+                    ? `, asked ${String(r.at.toDate().getHours()).padStart(2, '0')}:${String(r.at.toDate().getMinutes()).padStart(2, '0')}`
+                    : ''}
+                  )
+                </span>
               </p>
-              <button
-                type="button"
+              <p className="hint mono dim">
+                Check it's really them IN PERSON — their old phone gets
+                logged out of the game.
+              </p>
+              <ArmedButton
                 className="ghost-btn"
                 disabled={busy}
-                onClick={() => {
-                  if (window.confirm(`Re-link ${r.name} to the new phone? Check it's really them first — their old phone gets logged out of the game.`)) {
-                    run('Re-link', () => gmApproveReclaim({ newUid: r.id }))
-                  }
-                }}
-              >
-                APPROVE RE-LINK
-              </button>
+                label="APPROVE RE-LINK"
+                armedLabel={`REALLY ${r.name.toUpperCase()}? TAP AGAIN`}
+                onFire={() =>
+                  run('Re-link', () =>
+                    gmApproveReclaim({ newUid: r.id, players, reclaims }),
+                  )
+                }
+              />
             </div>
           ))}
         </section>
@@ -195,6 +204,11 @@ export default function GMScreen({ uid, me, players, reclaims, checkPin, loadRin
 
       <section className="dossier-card">
         <p className="field-label">AGENTS</p>
+        {ring === null && (
+          <p className="hint mono dim">
+            Ring still decrypting — REMOVE unlocks when it loads.
+          </p>
+        )}
         {alive.map((p) => {
           const hunterEdge = ring?.find((e) => e.target?.id === p.id)
           return (
@@ -203,32 +217,31 @@ export default function GMScreen({ uid, me, players, reclaims, checkPin, loadRin
                 {p.name} · {p.kills} kill{p.kills === 1 ? '' : 's'}
               </p>
               <div className="gm-btn-row">
-                <button
-                  type="button"
+                <ArmedButton
                   className="ghost-btn"
                   disabled={busy}
-                  onClick={() => {
-                    if (window.confirm(`Reroll ${p.name}'s object and location? Target stays the same.`)) {
-                      run('Reroll', () => gmRerollMission({ playerUid: p.id, playerName: p.name }))
-                    }
-                  }}
-                >
-                  REROLL
-                </button>
-                <button
-                  type="button"
+                  label="REROLL"
+                  armedLabel="NEW ORDERS? TAP AGAIN"
+                  onFire={() =>
+                    run('Reroll', () =>
+                      gmRerollMission({ playerUid: p.id, playerName: p.name }),
+                    )
+                  }
+                />
+                <ArmedButton
                   className="ghost-btn danger"
                   disabled={busy || !hunterEdge}
-                  onClick={() => {
-                    if (window.confirm(`Remove ${p.name} from the game (gone home / not playing)? Their assassin inherits their target.`)) {
-                      run('Remove', () =>
-                        gmRemovePlayer({ removedUid: p.id, assassinUid: hunterEdge.hunter.id }),
-                      )
-                    }
-                  }}
-                >
-                  REMOVE
-                </button>
+                  label="REMOVE"
+                  armedLabel="NO KILL CREDIT. TAP AGAIN"
+                  onFire={() =>
+                    run('Remove', () =>
+                      gmRemovePlayer({
+                        removedUid: p.id,
+                        assassinUid: hunterEdge.hunter.id,
+                      }),
+                    )
+                  }
+                />
               </div>
             </div>
           )
@@ -241,10 +254,11 @@ export default function GMScreen({ uid, me, players, reclaims, checkPin, loadRin
           type="button"
           className="ghost-btn"
           disabled={busy || alive.length < 2}
-          onClick={() => {
-            const pool = [...alive].sort(() => Math.random() - 0.5).slice(0, 2)
-            gmPressure(pool.map((p) => p.name))
-          }}
+          onClick={() =>
+            run('Taunt', async () =>
+              gmPressure(shuffled(alive).slice(0, 2).map((p) => p.name)),
+            )
+          }
         >
           POST A PRESSURE TAUNT
         </button>
@@ -259,19 +273,18 @@ export default function GMScreen({ uid, me, players, reclaims, checkPin, loadRin
         {[...alive]
           .sort((a, b) => b.kills - a.kills)
           .map((p) => (
-            <button
+            <ArmedButton
               key={p.id}
-              type="button"
               className="ghost-btn danger"
               disabled={busy}
-              onClick={() => {
-                if (window.confirm(`End the game and crown ${p.name} (${p.kills} kills)? This is final.`)) {
-                  run('End game', () => gmEndGame({ winnerUid: p.id, winnerName: p.name }))
-                }
-              }}
-            >
-              CROWN {p.name.toUpperCase()} ({p.kills})
-            </button>
+              label={`CROWN ${p.name.toUpperCase()} (${p.kills})`}
+              armedLabel="ENDS THE GAME FOREVER. TAP AGAIN"
+              onFire={() =>
+                run('End game', () =>
+                  gmEndGame({ winnerUid: p.id, winnerName: p.name }),
+                )
+              }
+            />
           ))}
       </section>
 

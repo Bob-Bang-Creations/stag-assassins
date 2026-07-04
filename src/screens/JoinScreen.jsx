@@ -50,13 +50,14 @@ export default function JoinScreen({ uid, game, players }) {
             a new phone (dead battery, cleared Safari), request a re-link and
             the Game Master will move you over.
           </p>
-          {reclaimSent ? (
+          {reclaimSent && (
             <p className="mono">
-              Request sent. Find the Game Master — they approve it from their
-              panel.
+              Request sent{name ? ` as ${name}` : ''}. Find the Game Master —
+              they approve it from their panel. Wrong name? Pick again and
+              resend.
             </p>
-          ) : (
-            <>
+          )}
+          <>
               <p className="field-label">WHO ARE YOU?</p>
               <div className="name-grid">
                 {ROSTER.map((rosterName) => (
@@ -64,7 +65,10 @@ export default function JoinScreen({ uid, game, players }) {
                     key={rosterName}
                     type="button"
                     className={`name-chip ${name === rosterName ? 'selected' : ''}`}
-                    onClick={() => setName(rosterName)}
+                    onClick={() => {
+                      setName(rosterName)
+                      setReclaimSent(false)
+                    }}
                   >
                     {rosterName}
                   </button>
@@ -88,10 +92,9 @@ export default function JoinScreen({ uid, game, players }) {
                 disabled={!name || code.trim() === '' || busy}
                 onClick={handleReclaim}
               >
-                {busy ? 'SENDING…' : 'REQUEST RE-LINK'}
+                {busy ? 'SENDING…' : reclaimSent ? 'RESEND RE-LINK' : 'REQUEST RE-LINK'}
               </button>
-            </>
-          )}
+          </>
         </div>
       </div>
     )

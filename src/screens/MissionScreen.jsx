@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import ArmedButton from '../components/ArmedButton'
 import { reportKill, verifyPin } from '../game'
 
 // The heart of the app: a PIN-gated dossier. Locks itself again whenever the
@@ -31,13 +32,6 @@ export default function MissionScreen({ uid, me, mission, players, checkPin }) {
   const [reporting, setReporting] = useState(false)
 
   async function handleReportKill() {
-    if (
-      !window.confirm(
-        `Report the kill on ${target.name}? Only report once their hand has closed on ${mission.object} ${mission.location}.`,
-      )
-    ) {
-      return
-    }
     setReportError(null)
     setReporting(true)
     try {
@@ -158,20 +152,21 @@ export default function MissionScreen({ uid, me, mission, players, checkPin }) {
           </p>
         )}
         {reportError && <p className="error mono">{reportError}</p>}
-        <button
-          type="button"
+        <ArmedButton
           className="primary-btn"
           disabled={
             !target || target.status !== 'alive' || awaitingConfirm || reporting
           }
-          onClick={handleReportKill}
-        >
-          {awaitingConfirm
-            ? 'AWAITING CONFIRMATION'
-            : reporting
-              ? 'REPORTING…'
-              : 'REPORT KILL'}
-        </button>
+          label={
+            awaitingConfirm
+              ? 'AWAITING CONFIRMATION'
+              : reporting
+                ? 'REPORTING…'
+                : 'REPORT KILL'
+          }
+          armedLabel="HAND CLOSED ON OBJECT? TAP AGAIN"
+          onFire={handleReportKill}
+        />
         <button
           type="button"
           className="ghost-btn"

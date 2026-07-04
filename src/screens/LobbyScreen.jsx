@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import ArmedButton from '../components/ArmedButton'
 import { gmApproveReclaim, startGame } from '../game'
 import { JOIN_CODE, ROSTER } from '../gameConfig'
 
@@ -10,14 +11,6 @@ export default function LobbyScreen({ me, isGM, players, reclaims = [] }) {
   const missing = ROSTER.filter((name) => !joinedNames.has(name))
 
   async function handleStart() {
-    if (
-      missing.length > 0 &&
-      !window.confirm(
-        `Only ${players.length} of ${ROSTER.length} are in (missing: ${missing.join(', ')}). Start without them?`,
-      )
-    ) {
-      return
-    }
     setError(null)
     setBusy(true)
     try {
@@ -70,37 +63,35 @@ export default function LobbyScreen({ me, isGM, players, reclaims = [] }) {
               {reclaims.map((r) => (
                 <div key={r.id} className="gm-row">
                   <p className="mono">Someone claims to be {r.name} on a new phone.</p>
-                  <button
-                    type="button"
+                  <ArmedButton
                     className="ghost-btn"
                     disabled={busy}
-                    onClick={async () => {
-                      if (!window.confirm(`Re-link ${r.name}? Check it's really them first.`)) return
+                    label="APPROVE RE-LINK"
+                    armedLabel={`REALLY ${r.name.toUpperCase()}? TAP AGAIN`}
+                    onFire={async () => {
                       setError(null)
                       setBusy(true)
                       try {
-                        await gmApproveReclaim({ newUid: r.id })
+                        await gmApproveReclaim({ newUid: r.id, players, reclaims })
                       } catch (err) {
                         setError(err.message)
                       }
                       setBusy(false)
                     }}
-                  >
-                    APPROVE RE-LINK
-                  </button>
+                  />
                 </div>
               ))}
             </>
           )}
           {error && <p className="error mono">{error}</p>}
-          <button
-            type="button"
+          <ArmedButton
             className="primary-btn"
             disabled={busy}
-            onClick={handleStart}
-          >
-            {busy ? 'DEALING MISSIONS…' : 'START THE GAME'}
-          </button>
+            requireArm={missing.length > 0}
+            label={busy ? 'DEALING MISSIONS…' : 'START THE GAME'}
+            armedLabel={`${missing.length} MISSING — TAP AGAIN TO START ANYWAY`}
+            onFire={handleStart}
+          />
           <p className="hint mono dim">
             Starting shuffles everyone into one ring and deals each agent a
             target, an object and a location. No going back.
