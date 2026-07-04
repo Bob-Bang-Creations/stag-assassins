@@ -5,20 +5,19 @@ export const GAME_ID = 'stag-manchester-2026'
 // Shown on the QR card / group chat. Checked client-side at join.
 export const JOIN_CODE = 'STAG18'
 
-// TODO: replace with the real 11 names before Friday 17 July.
 // Players pick their name from this list at join — no typos, no duplicates.
 export const ROSTER = [
   'Bob',
-  'Dave',
+  'Alex',
+  'Liam',
+  'Matt',
+  'Joe',
   'Jonty',
-  'Steve',
-  'Tom',
-  'Harry',
-  'Pete',
-  'Will',
-  'Jack',
+  'Lewis',
   'Ollie',
+  'Ryan',
   'Sam',
+  'Thomas',
 ]
 
 // The roster name that gets the GM tools (Start button, GM panel).
