@@ -75,7 +75,6 @@ function devPreview() {
             : p,
         )}
         reclaims={[{ id: 'new-uid-1', name: 'Liam' }]}
-        checkPin={(pin) => pin === '1234'}
         loadRing={async () => fakeRing}
       />
     )
@@ -87,7 +86,6 @@ function devPreview() {
         me={fakePlayers[0]}
         mission={{ targetId: 'fake-2', object: 'a rubber duck', location: 'at the bar' }}
         players={fakePlayers}
-        checkPin={(pin) => pin === '1234'}
       />
     )
   }
@@ -101,7 +99,6 @@ function devPreview() {
           pendingKillLocation: 'in the smoking area',
         }}
         players={fakePlayers}
-        checkPin={(pin) => pin === '1234'}
         onConfirm={async () => 'died'}
         onDispute={async () => {}}
       />

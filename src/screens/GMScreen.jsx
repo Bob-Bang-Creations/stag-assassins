@@ -10,35 +10,20 @@ import {
   gmRemovePlayer,
   gmRerollMission,
   shuffled,
-  verifyPin,
 } from '../game'
 
-// The organiser's toolbox. PIN-gated with the GM's own PIN (the GM plays
-// too — full-ring visibility is an adjudication tool, not a cheat sheet,
-// and the gate keeps a borrowed phone out of it).
-export default function GMScreen({ uid, me, players, reclaims, checkPin, loadRing }) {
-  const [unlocked, setUnlocked] = useState(false)
-  const [pin, setPin] = useState('')
+// The organiser's toolbox. Full-ring visibility is an adjudication tool, not
+// a cheat sheet — the GM plays too, so their own hunter stays redacted until
+// they deliberately tap it (honesty required, it's a stag do not the Hague).
+export default function GMScreen({ uid, me, players, reclaims, loadRing }) {
   const [ring, setRing] = useState(null)
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
   const [ringStamp, setRingStamp] = useState(0)
   const [showMyHunter, setShowMyHunter] = useState(false)
 
-  useEffect(() => {
-    function relock() {
-      if (document.hidden) {
-        setUnlocked(false)
-        setPin('')
-      }
-    }
-    document.addEventListener('visibilitychange', relock)
-    return () => document.removeEventListener('visibilitychange', relock)
-  }, [])
-
   const playersKey = players.map((p) => `${p.id}:${p.status}`).join('|')
   useEffect(() => {
-    if (!unlocked) return undefined
     let cancelled = false
     const load = loadRing ?? fetchRing
     load(players).then((edges) => {
@@ -48,7 +33,7 @@ export default function GMScreen({ uid, me, players, reclaims, checkPin, loadRin
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [unlocked, playersKey, ringStamp])
+  }, [playersKey, ringStamp])
 
   const alive = players.filter((p) => p.status === 'alive')
   const pendingVictims = players.filter(
@@ -66,54 +51,6 @@ export default function GMScreen({ uid, me, players, reclaims, checkPin, loadRin
       setError(`${label}: ${err.message}`)
     }
     setBusy(false)
-  }
-
-  async function handleUnseal() {
-    setError(null)
-    setBusy(true)
-    try {
-      const ok = await (checkPin ? checkPin(pin) : verifyPin(uid, pin))
-      if (ok) {
-        setUnlocked(true)
-        setPin('')
-      } else {
-        setError('Wrong PIN.')
-      }
-    } catch {
-      setError('No signal — try again when you reconnect.')
-    }
-    setBusy(false)
-  }
-
-  if (!unlocked) {
-    return (
-      <div className="screen centered">
-        <div className="dossier-card mission-card sealed">
-          <p className="classified-stamp">GM ONLY</p>
-          <label className="field-label" htmlFor="gm-pin">ENTER YOUR PIN</label>
-          <input
-            id="gm-pin"
-            className="big-input mono pin-mask"
-            type="text"
-            inputMode="numeric"
-            maxLength={4}
-            autoComplete="off"
-            placeholder="0000"
-            value={pin}
-            onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
-          />
-          {error && <p className="error mono">{error}</p>}
-          <button
-            type="button"
-            className="primary-btn"
-            disabled={!/^\d{4}$/.test(pin) || busy}
-            onClick={handleUnseal}
-          >
-            {busy ? 'CHECKING…' : 'OPEN THE PANEL'}
-          </button>
-        </div>
-      </div>
-    )
   }
 
   return (

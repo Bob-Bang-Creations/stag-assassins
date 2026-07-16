@@ -102,8 +102,10 @@ service cloud.firestore {
         allow update: if isPlayer() || isGM();
         allow delete: if isGM();
 
-        // Mission secrets (target, object, location) and PIN. Spectators
-        // get missions only — never other people's PINs.
+        // Mission secrets (target, object, location) live here, readable
+        // only by the owner, the GM, and — once dead or the game's over —
+        // spectators. (No behavioural change from the PIN removal; the
+        // secrets doc simply isn't written any more.)
         match /private/{docId} {
           allow read: if signedIn()
             && (request.auth.uid == playerId || isGM()

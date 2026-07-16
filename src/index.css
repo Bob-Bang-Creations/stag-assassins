@@ -589,11 +589,33 @@ button {
   to { opacity: 0.75; }
 }
 
-/* PIN masking without type=password (which triggers iOS keychain UI) */
+/* Hold-to-reveal mission brief */
 
-.pin-mask {
-  -webkit-text-security: disc;
-  letter-spacing: 0.4em;
+.no-select {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.hold-btn {
+  min-height: 64px;
+  width: 100%;
+  border: 2px dashed var(--accent);
+  border-radius: 8px;
+  background: var(--accent-dim);
+  color: var(--accent);
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  touch-action: none; /* holding must not scroll or long-press-select */
+}
+
+.hold-btn.holding {
+  background: var(--accent);
+  color: #fff;
+  border-style: solid;
 }
 
 /* Offline banner */

@@ -5,7 +5,6 @@ import { ROSTER } from '../gameConfig'
 export default function JoinScreen({ uid, game, players }) {
   const [code, setCode] = useState('')
   const [name, setName] = useState(null)
-  const [pin, setPin] = useState('')
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
   const [reclaimSent, setReclaimSent] = useState(false)
@@ -101,17 +100,16 @@ export default function JoinScreen({ uid, game, players }) {
   }
 
   const takenNames = new Set(players.map((p) => p.name))
-  // Someone else can claim the selected name while this user types their
-  // PIN; the live snapshot catches it before submit.
+  // Someone else can claim the selected name between selecting it and
+  // submitting; the live snapshot catches it before submit.
   const nameTaken = name !== null && takenNames.has(name)
-  const pinValid = /^\d{4}$/.test(pin)
-  const ready = code.trim() !== '' && name !== null && !nameTaken && pinValid && !busy
+  const ready = code.trim() !== '' && name !== null && !nameTaken && !busy
 
   async function handleJoin() {
     setError(null)
     setBusy(true)
     try {
-      await joinGame({ uid, name, pin, code })
+      await joinGame({ uid, name, code })
     } catch (err) {
       setError(err.message)
       setBusy(false)
@@ -180,25 +178,9 @@ export default function JoinScreen({ uid, game, players }) {
           </p>
         )}
 
-        <label className="field-label" htmlFor="pin">
-          SET A 4-DIGIT PIN
-        </label>
-        {/* text + inputMode, not type=password: iOS pushes keychain UI onto
-            password fields. Masking is done in CSS (pin-mask). */}
-        <input
-          id="pin"
-          className="big-input mono pin-mask"
-          type="text"
-          inputMode="numeric"
-          maxLength={4}
-          autoComplete="off"
-          placeholder="0000"
-          value={pin}
-          onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
-        />
         <p className="hint mono dim">
-          Your PIN locks your mission card. Don't forget it, and don't use your
-          bank one.
+          No password to remember. Your mission card stays sealed until you
+          press and hold it — let go and it hides again.
         </p>
 
         {error && <p className="error mono">{error}</p>}

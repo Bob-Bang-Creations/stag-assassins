@@ -30,8 +30,8 @@ export default function ResetGamePanel() {
     <section className="dossier-card reset-card">
       <p className="field-label danger-label">DANGER · RESET THE GAME</p>
       <p className="hint mono dim">
-        Wipes every player, mission, PIN, death and the feed, and returns to
-        an empty lobby. Everyone re-joins from scratch. Cannot be undone.
+        Wipes every player, mission, death and the feed, and returns to an
+        empty lobby. Everyone re-joins from scratch. Cannot be undone.
       </p>
       <label className="field-label" htmlFor="reset-confirm">
         TYPE RESET TO CONFIRM

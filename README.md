@@ -50,8 +50,12 @@ identity on close).
   stranger who finds the URL can read the feed but can't write anything.
   If you change `JOIN_CODE` in `src/gameConfig.js`, update `codeOk()` in
   `firestore.rules` and republish.
-- Mission secrets and PINs live in each player's `private/` subcollection,
-  readable only by that player and the GM.
+- Mission secrets (target, object, location) live in each player's
+  `private/` subcollection, readable only by that player and the GM (and
+  spectators once dead / the game's over).
+- No PINs. The mission card is **hold-to-reveal**: it stays sealed until you
+  press and hold it, and hides the instant you let go — so a shoulder-surfer
+  or a set-down phone never shows your target.
 - The GM role (`gmUid` on the game doc) can be set once, only to yourself,
   never changed — it can't be seized from a browser console.
 - Transactions (join, start, kill handshake) need signal; plain reads and
@@ -93,8 +97,8 @@ for it and drop it in the group chat on the Friday.
   have *separate identities*; switching between them mid-game looks like a
   lost phone and needs a GM re-link.
 - No private browsing — it forgets who you are when it closes.
-- Remember your 4-digit PIN. It guards your mission card and it's the only
-  thing that lets you confirm your own death.
+- No password to remember: **press and hold your mission card to read it**,
+  let go and it hides. Keep it to yourself.
 
 ## GM notes
 
@@ -107,7 +111,7 @@ for it and drop it in the group chat on the Friday.
 - REMOVE gives no kill credit ("fled the city"); FORCE CONFIRM does. Pick
   by what actually happened.
 - **RESET THE GAME** (bottom of the lobby, the GM panel, and the game-over
-  screen — GM only) wipes every player, mission, PIN, death and the feed
+  screen — GM only) wipes every player, mission, death and the feed
   back to an empty lobby; everyone re-joins. You must type `RESET` to
   confirm. Use it to clear the dry-run before the real night. Clearing the
   **feed** on reset needs one extra rule — re-publish `firestore.rules`

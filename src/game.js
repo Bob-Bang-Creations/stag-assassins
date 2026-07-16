@@ -24,8 +24,6 @@ export const gameRef = () => doc(db, 'games', GAME_ID)
 export const playerRef = (uid) => doc(db, 'games', GAME_ID, 'players', uid)
 export const missionRef = (uid) =>
   doc(db, 'games', GAME_ID, 'players', uid, 'private', 'mission')
-export const secretsRef = (uid) =>
-  doc(db, 'games', GAME_ID, 'players', uid, 'private', 'secrets')
 export const nameRef = (name) => doc(db, 'games', GAME_ID, 'names', name)
 export const eventsCol = () => collection(db, 'games', GAME_ID, 'events')
 export const reclaimRef = (uid) => doc(db, 'games', GAME_ID, 'reclaims', uid)
@@ -63,7 +61,7 @@ function randomFrom(list) {
 // Join: claim a roster name and create the player doc. Runs in a transaction
 // so two phones grabbing the same name at once can't both win — the name
 // claim doc (id = the name itself) is the lock.
-export async function joinGame({ uid, name, pin, code }) {
+export async function joinGame({ uid, name, code }) {
   if (code.trim().toUpperCase() !== JOIN_CODE.toUpperCase()) {
     throw new Error('Wrong join code. Check the card.')
   }
@@ -122,19 +120,16 @@ export async function joinGame({ uid, name, pin, code }) {
       diedAt: null,
       joinedAt: serverTimestamp(),
     })
-    // PIN lives in private/, readable only by this player and the GM.
-    tx.set(secretsRef(uid), { pin })
   })
   postEvent('join', `${name} has entered the game`)
 }
 
 // ---------------------------------------------------------------------------
-// GM tools. All guarded by rules (isGM = the locked gmUid on the game doc);
-// the UI additionally PIN-gates the panel with the GM's own PIN.
+// GM tools. All guarded by rules (isGM = the locked gmUid on the game doc).
 
 // Recovery: a player on a new phone (dead battery, cleared Safari, private
 // browsing) posts a reclaim request; the GM approves and their whole
-// identity — player doc, mission, PIN — migrates to the new uid.
+// identity — player doc and mission — migrates to the new uid.
 export async function requestReclaim({ uid, name, code }) {
   if (code.trim().toUpperCase() !== JOIN_CODE.toUpperCase()) {
     throw new Error('Wrong join code. Check the card.')
@@ -181,7 +176,6 @@ export async function gmApproveReclaim({ newUid, players = [], reclaims = [] }) 
       throw new Error(`${name} has no player doc — have them join normally.`)
     }
     const oldMissionSnap = await tx.get(missionRef(oldUid))
-    const oldSecretsSnap = await tx.get(secretsRef(oldUid))
 
     // Ring rewiring: whoever hunts the old uid must hunt the new one, and
     // an outstanding report BY the old uid must follow them too — otherwise
@@ -221,7 +215,6 @@ export async function gmApproveReclaim({ newUid, players = [], reclaims = [] }) 
     // --- writes ---
     tx.set(playerRef(newUid), oldPlayerSnap.data())
     if (oldMissionSnap.exists()) tx.set(missionRef(newUid), oldMissionSnap.data())
-    if (oldSecretsSnap.exists()) tx.set(secretsRef(newUid), oldSecretsSnap.data())
     if (hunterUid) {
       tx.set(missionRef(hunterUid), { targetId: newUid }, { merge: true })
     }
@@ -230,7 +223,6 @@ export async function gmApproveReclaim({ newUid, players = [], reclaims = [] }) 
     }
     tx.update(nameRef(name), { uid: newUid })
     tx.delete(missionRef(oldUid))
-    tx.delete(secretsRef(oldUid))
     tx.delete(playerRef(oldUid))
     tx.delete(reclaimRef(newUid))
     // Clear duplicate requests for the same name so a stale one can't be
@@ -372,7 +364,7 @@ export function gmPressure(names) {
   )
 }
 
-// Full reset (GM only): wipe every player, mission, PIN, name claim,
+// Full reset (GM only): wipe every player, mission, name claim,
 // reclaim request and the feed, and return to an empty lobby. Everyone
 // re-joins from scratch. The game doc itself survives (it can't be deleted,
 // and its gmUid lock is permanent) — status flips back to lobby and the
@@ -394,7 +386,7 @@ export async function gmResetGame() {
 
   const refs = []
   playersSnap.forEach((d) => {
-    refs.push(missionRef(d.id), secretsRef(d.id), playerRef(d.id))
+    refs.push(missionRef(d.id), playerRef(d.id))
   })
   namesSnap.forEach((d) => refs.push(nameRef(d.id)))
   reclaimsSnap.forEach((d) => refs.push(reclaimRef(d.id)))
@@ -447,13 +439,6 @@ export async function fetchRing(players) {
       }
     })
     .filter(Boolean)
-}
-
-// PIN gate for the mission card. A human-level lock, not crypto: it stops
-// the mate who grabs an unlocked phone, not the mate with a debugger.
-export async function verifyPin(uid, pin) {
-  const snap = await getDoc(secretsRef(uid))
-  return snap.exists() && snap.data().pin === pin
 }
 
 // Start: shuffle all players into a single ring (Hamiltonian cycle — each

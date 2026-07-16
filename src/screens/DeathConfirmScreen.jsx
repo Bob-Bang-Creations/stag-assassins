@@ -1,21 +1,18 @@
 import { useState } from 'react'
-import { confirmDeath, disputeKill, verifyPin } from '../game'
+import ArmedButton from '../components/ArmedButton'
+import { confirmDeath, disputeKill } from '../game'
 
 // The victim's phone flips here the moment their assassin reports the kill.
-// Victim-driven by design: assassins have every incentive to lie. Confirming
-// is the game's one irreversible action, so it is PIN-gated — the assassin
-// (or anyone else) holding this phone must not be able to kill its owner.
-// Dispute stays open: the worst a phone-grabber can do with it is summon
-// the GM.
+// Victim-driven by design: assassins have every incentive to lie, victims
+// none. Confirming is irreversible, so it takes a deliberate second tap
+// (tap-again to arm) to guard against a fat-fingered self-elimination.
 export default function DeathConfirmScreen({
   me,
   players,
   onConfirm,
   onDispute,
-  checkPin,
   onNotice,
 }) {
-  const [pin, setPin] = useState('')
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
 
@@ -25,20 +22,7 @@ export default function DeathConfirmScreen({
   async function handleConfirm() {
     setError(null)
     setBusy(true)
-    let pinOk
     try {
-      pinOk = await (checkPin ? checkPin(pin) : verifyPin(me.id, pin))
-    } catch {
-      setError('No signal — try again when you reconnect.')
-      setBusy(false)
-      return
-    }
-    try {
-      if (!pinOk) {
-        setError('Wrong PIN. Only the deceased may confirm their own death.')
-        setBusy(false)
-        return
-      }
       const outcome = await (onConfirm
         ? onConfirm()
         : confirmDeath({ victimUid: me.id }))
@@ -86,31 +70,15 @@ export default function DeathConfirmScreen({
           didn't happen like that, dispute it.
         </p>
 
-        <label className="field-label" htmlFor="death-pin">
-          YOUR PIN TO CONFIRM
-        </label>
-        <input
-          id="death-pin"
-          className="big-input mono pin-mask"
-          type="text"
-          inputMode="numeric"
-          maxLength={4}
-          autoComplete="off"
-          placeholder="0000"
-          value={pin}
-          onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
-        />
-
         {error && <p className="error mono">{error}</p>}
 
-        <button
-          type="button"
+        <ArmedButton
           className="primary-btn"
-          disabled={busy || !/^\d{4}$/.test(pin)}
-          onClick={handleConfirm}
-        >
-          {busy ? '…' : "IT'S TRUE. I'M DEAD"}
-        </button>
+          disabled={busy}
+          label={busy ? '…' : "IT'S TRUE. I'M DEAD"}
+          armedLabel="SURE? TAP AGAIN TO DIE"
+          onFire={handleConfirm}
+        />
         <button
           type="button"
           className="ghost-btn"

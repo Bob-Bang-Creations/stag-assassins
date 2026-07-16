@@ -1,25 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import ArmedButton from '../components/ArmedButton'
-import { reportKill, verifyPin } from '../game'
+import { reportKill } from '../game'
 
-// The heart of the app: a PIN-gated dossier. Locks itself again whenever the
-// page is hidden (pocket, app switch, mate grabbing the phone mid-pint).
-export default function MissionScreen({ uid, me, mission, players, checkPin }) {
-  const [unlocked, setUnlocked] = useState(false)
-  const [pin, setPin] = useState('')
-  const [error, setError] = useState(null)
-  const [busy, setBusy] = useState(false)
-
-  useEffect(() => {
-    function relock() {
-      if (document.hidden) {
-        setUnlocked(false)
-        setPin('')
-      }
-    }
-    document.addEventListener('visibilitychange', relock)
-    return () => document.removeEventListener('visibilitychange', relock)
-  }, [])
+// The heart of the app: a dossier you HOLD to reveal. Nothing is shown until
+// a finger is pressed on the reveal pad, and it re-hides the instant you let
+// go — so a glance over your shoulder (or letting go to put the phone down)
+// keeps your target secret. No PIN to forget in a dark pub.
+export default function MissionScreen({ uid, me, mission, players }) {
+  const [revealed, setRevealed] = useState(false)
+  const [reportError, setReportError] = useState(null)
+  const [reporting, setReporting] = useState(false)
 
   const aliveCount = players.filter((p) => p.status === 'alive').length
   const target = mission
@@ -28,8 +18,6 @@ export default function MissionScreen({ uid, me, mission, players, checkPin }) {
   // Our report is pending until the target confirms (their doc carries the
   // flag, and everyone can read player docs).
   const awaitingConfirm = Boolean(target && target.pendingKillFrom === uid)
-  const [reportError, setReportError] = useState(null)
-  const [reporting, setReporting] = useState(false)
 
   async function handleReportKill() {
     setReportError(null)
@@ -48,23 +36,6 @@ export default function MissionScreen({ uid, me, mission, players, checkPin }) {
     setReporting(false)
   }
 
-  async function handleUnseal() {
-    setError(null)
-    setBusy(true)
-    try {
-      const ok = await (checkPin ? checkPin(pin) : verifyPin(uid, pin))
-      if (ok) {
-        setUnlocked(true)
-        setPin('')
-      } else {
-        setError('Wrong PIN. This dossier stays sealed.')
-      }
-    } catch {
-      setError('No signal — try again when you reconnect.')
-    }
-    setBusy(false)
-  }
-
   if (!mission) {
     return (
       <div className="screen centered">
@@ -73,42 +44,17 @@ export default function MissionScreen({ uid, me, mission, players, checkPin }) {
     )
   }
 
-  if (!unlocked) {
-    return (
-      <div className="screen centered">
-        <div className="dossier-card mission-card sealed">
-          <p className="classified-stamp">CLASSIFIED</p>
-          <p className="field-label centered-text">DOSSIER SEALED · AGENT {me.name?.toUpperCase()}</p>
-          <label className="field-label" htmlFor="unseal-pin">ENTER PIN</label>
-          <input
-            id="unseal-pin"
-            className="big-input mono pin-mask"
-            type="text"
-            inputMode="numeric"
-            maxLength={4}
-            autoComplete="off"
-            placeholder="0000"
-            value={pin}
-            onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
-          />
-          {error && <p className="error mono">{error}</p>}
-          <button
-            type="button"
-            className="primary-btn"
-            disabled={!/^\d{4}$/.test(pin) || busy}
-            onClick={handleUnseal}
-          >
-            {busy ? 'CHECKING…' : 'UNSEAL'}
-          </button>
-        </div>
-      </div>
-    )
-  }
+  const hide = () => setRevealed(false)
 
   return (
     <div className="screen">
-      <div className="dossier-card mission-card open">
-        <p className="field-label centered-text">TOP SECRET · EYES ONLY</p>
+      <div
+        className={`dossier-card mission-card no-select ${revealed ? 'open' : ''}`}
+        onContextMenu={(e) => e.preventDefault()}
+      >
+        <p className="field-label centered-text">
+          {revealed ? 'TOP SECRET · EYES ONLY' : `AGENT ${me.name?.toUpperCase()} · DOSSIER`}
+        </p>
 
         {aliveCount === 2 && (
           <p className="final-two mono">
@@ -134,6 +80,17 @@ export default function MissionScreen({ uid, me, mission, players, checkPin }) {
             <span className="redact">{mission.location}</span>
           </p>
         </div>
+
+        <button
+          type="button"
+          className={`hold-btn ${revealed ? 'holding' : ''}`}
+          onPointerDown={() => setRevealed(true)}
+          onPointerUp={hide}
+          onPointerLeave={hide}
+          onPointerCancel={hide}
+        >
+          {revealed ? 'RELEASE TO HIDE' : 'HOLD TO REVEAL BRIEF'}
+        </button>
 
         <p className="hint mono dim">
           The kill counts the moment their hand closes on the object, both of
@@ -167,13 +124,6 @@ export default function MissionScreen({ uid, me, mission, players, checkPin }) {
           armedLabel="HAND CLOSED ON OBJECT? TAP AGAIN"
           onFire={handleReportKill}
         />
-        <button
-          type="button"
-          className="ghost-btn"
-          onClick={() => setUnlocked(false)}
-        >
-          CONCEAL DOSSIER
-        </button>
         <p className="hint mono dim centered-text">
           Mission dispute or impossible ask? Take it to the Game Master.
         </p>
