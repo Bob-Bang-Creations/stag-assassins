@@ -26,7 +26,10 @@ export const ROSTER = [
 export const GM_NAME = 'Bob'
 
 // Objects: pocketable, pub-safe, cheap. Assigned without replacement,
-// refilled when exhausted.
+// refilled when exhausted. Trim or add lines freely before Friday — no
+// other change needed. Some are found on the night (bottle cap, straw,
+// cork), some come from a pound shop / party-bag aisle beforehand (duck,
+// dinosaur, googly eye) — assassins supply their own weapons.
 export const OBJECTS = [
   'a beer mat',
   'a lemon slice',
@@ -39,10 +42,22 @@ export const OBJECTS = [
   'a party ring biscuit',
   'a rubber duck',
   'a birthday candle',
+  'a bottle cap',
+  'a drinking straw',
+  'a sugar sachet',
+  'a wine cork',
+  'a poker chip',
+  'a single dice',
+  'a stick of chewing gum',
+  'a googly eye',
+  'a small toy dinosaur',
 ]
 
-// Locations: venue-agnostic zones that exist in any pub or club, so no
-// mission can go stale as the crawl moves on.
+// Locations: zones that exist on any night out, so no mission goes stale
+// as the crawl moves on. The first eight exist inside literally any venue;
+// the rest exist across the night (street, takeaway, cash machine) or in
+// almost every venue — if one ever goes stale, the GM reroll fixes it.
+// Trim or add lines freely before Friday.
 export const LOCATIONS = [
   'at the bar',
   'in the smoking area',
@@ -52,4 +67,16 @@ export const LOCATIONS = [
   'in the beer garden or outdoor area',
   'while standing in any queue',
   'by the door',
+  'on the way to or from the toilets',
+  'while leaning against a wall',
+  'by a window',
+  'while walking between venues',
+  'in a takeaway, kebab or chip shop',
+  'at or by a cash machine',
+  'within sight of the stag',
+  'at a high table or leaning on a ledge',
+  'by the pool table, darts or fruit machine',
+  'within earshot of the bouncer',
+  'under a TV or screen',
+  'on or by the stairs',
 ]
