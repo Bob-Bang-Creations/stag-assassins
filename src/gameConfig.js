@@ -62,5 +62,6 @@ export const LOCATIONS = [
   'while walking between venues',
   'by the stag',
   'at the hotel',
-  'while a group photo is being taken',
+  'during a round of shots',
+  'while the stag is away from the group',
 ]
