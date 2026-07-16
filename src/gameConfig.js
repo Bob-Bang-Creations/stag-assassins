@@ -40,6 +40,10 @@ export const OBJECTS = [
   'a drinking straw',
   'a wine cork',
   'a stick of chewing gum',
+  'a napkin',
+  'a receipt',
+  'a lighter',
+  'a packet of crisps',
 ]
 
 // Locations: zones that exist on any night out, so no mission goes stale
@@ -57,4 +61,6 @@ export const LOCATIONS = [
   'on the way to or from the toilets',
   'while walking between venues',
   'by the stag',
+  'at the hotel',
+  'while a group photo is being taken',
 ]
