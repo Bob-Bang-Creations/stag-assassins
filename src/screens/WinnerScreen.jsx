@@ -1,6 +1,7 @@
+import ResetGamePanel from '../components/ResetGamePanel'
 import { EventList } from './FeedScreen'
 
-export default function WinnerScreen({ me, game, players, events }) {
+export default function WinnerScreen({ me, game, players, events, isGM }) {
   const winner = players.find((p) => p.id === game.winnerId)
   const youWon = Boolean(me && winner && me.id === winner.id)
 
@@ -53,6 +54,8 @@ export default function WinnerScreen({ me, game, players, events }) {
         <p className="field-label">HOW IT WENT DOWN</p>
         <EventList events={events} />
       </section>
+
+      {isGM && <ResetGamePanel />}
     </div>
   )
 }

@@ -127,6 +127,7 @@ function devPreview() {
         game={{ ...fakeGame, status: 'finished' }}
         players={fakePlayers}
         events={fakeEvents}
+        isGM
       />
     )
   }
@@ -268,7 +269,13 @@ export default function App() {
     }
   } else if (game?.status === 'finished') {
     screen = (
-      <WinnerScreen me={me} game={game} players={players} events={events} />
+      <WinnerScreen
+        me={me}
+        game={game}
+        players={players}
+        events={events}
+        isGM={isGM}
+      />
     )
   } else {
     screen = (

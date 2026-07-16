@@ -10,9 +10,12 @@ import {
   collection,
   doc,
   getDoc,
+  getDocs,
   runTransaction,
   serverTimestamp,
   setDoc,
+  updateDoc,
+  writeBatch,
 } from 'firebase/firestore'
 import { db } from './firebase'
 import { GAME_ID, GM_NAME, JOIN_CODE, LOCATIONS, OBJECTS } from './gameConfig'
@@ -367,6 +370,60 @@ export function gmPressure(names) {
     'gm_action',
     `The city grows restless. All eyes on ${names.join(' and ')}.`,
   )
+}
+
+// Full reset (GM only): wipe every player, mission, PIN, name claim,
+// reclaim request and the feed, and return to an empty lobby. Everyone
+// re-joins from scratch. The game doc itself survives (it can't be deleted,
+// and its gmUid lock is permanent) — status flips back to lobby and the
+// player count resets to zero.
+//
+// Not a transaction: it's a deliberate, confirmed, single-operator action
+// with no race to guard against, and it spans more docs than one
+// transaction should. Deletes are chunked into batches (Firestore caps a
+// batch at 500 writes). The feed is cleared best-effort: clearing events
+// needs the events `delete` rule (added in firestore.rules) — if that rule
+// hasn't been re-published yet, the reset still completes and just leaves
+// the old feed behind.
+export async function gmResetGame() {
+  const [playersSnap, namesSnap, reclaimsSnap] = await Promise.all([
+    getDocs(collection(db, 'games', GAME_ID, 'players')),
+    getDocs(collection(db, 'games', GAME_ID, 'names')),
+    getDocs(collection(db, 'games', GAME_ID, 'reclaims')),
+  ])
+
+  const refs = []
+  playersSnap.forEach((d) => {
+    refs.push(missionRef(d.id), secretsRef(d.id), playerRef(d.id))
+  })
+  namesSnap.forEach((d) => refs.push(nameRef(d.id)))
+  reclaimsSnap.forEach((d) => refs.push(reclaimRef(d.id)))
+  await commitDeletes(refs)
+
+  // Feed: best-effort in its own batch so a not-yet-published delete rule
+  // can't fail the whole reset.
+  try {
+    const eventsSnap = await getDocs(eventsCol())
+    await commitDeletes(eventsSnap.docs.map((d) => d.ref))
+  } catch (err) {
+    console.warn('Feed not cleared (publish the events delete rule):', err)
+  }
+
+  // Back to a fresh, empty lobby. gmUid and joinCode are left untouched.
+  await updateDoc(gameRef(), {
+    status: 'lobby',
+    winnerId: null,
+    playerCount: 0,
+    endsAt: null,
+  })
+}
+
+async function commitDeletes(refs) {
+  for (let i = 0; i < refs.length; i += 400) {
+    const batch = writeBatch(db)
+    refs.slice(i, i + 400).forEach((ref) => batch.delete(ref))
+    await batch.commit()
+  }
 }
 
 // Spectator ring reveal: dead players (and anyone once the game finishes)

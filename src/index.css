@@ -563,6 +563,17 @@ button {
   color: var(--accent);
 }
 
+/* Reset panel — visually cordoned off from the routine controls */
+
+.reset-card {
+  border-color: var(--accent);
+  border-style: dashed;
+}
+
+.danger-label {
+  color: var(--accent);
+}
+
 /* Armed (tap-again-to-confirm) state */
 
 .primary-btn.armed,

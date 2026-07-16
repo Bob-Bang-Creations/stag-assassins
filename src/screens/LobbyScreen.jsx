@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import ArmedButton from '../components/ArmedButton'
+import ResetGamePanel from '../components/ResetGamePanel'
 import { gmApproveReclaim, startGame } from '../game'
 import { JOIN_CODE, ROSTER } from '../gameConfig'
 
@@ -106,6 +107,8 @@ export default function LobbyScreen({ me, isGM, players, reclaims = [] }) {
           <strong>{JOIN_CODE}</strong>
         </p>
       )}
+
+      {isGM && <ResetGamePanel />}
     </div>
   )
 }

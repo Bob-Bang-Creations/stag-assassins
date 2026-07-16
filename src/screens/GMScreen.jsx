@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import ArmedButton from '../components/ArmedButton'
+import ResetGamePanel from '../components/ResetGamePanel'
 import {
   confirmDeath,
   fetchRing,
@@ -327,6 +328,8 @@ export default function GMScreen({ uid, me, players, reclaims, checkPin, loadRin
           assassin. Honesty required — it's a stag do, not the Hague.
         </p>
       )}
+
+      <ResetGamePanel />
     </div>
   )
 }

@@ -135,6 +135,8 @@ service cloud.firestore {
       match /events/{eventId} {
         allow read: if signedIn();
         allow create: if isPlayer();
+        // Only the GM's full-game reset clears the feed.
+        allow delete: if isGM();
       }
 
       // Phone-switch recovery: a new device posts a request under its own

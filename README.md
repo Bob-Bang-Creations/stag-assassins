@@ -106,3 +106,10 @@ for it and drop it in the group chat on the Friday.
   `gmUid` on the game doc).
 - REMOVE gives no kill credit ("fled the city"); FORCE CONFIRM does. Pick
   by what actually happened.
+- **RESET THE GAME** (bottom of the lobby, the GM panel, and the game-over
+  screen — GM only) wipes every player, mission, PIN, death and the feed
+  back to an empty lobby; everyone re-joins. You must type `RESET` to
+  confirm. Use it to clear the dry-run before the real night. Clearing the
+  **feed** on reset needs one extra rule — re-publish `firestore.rules`
+  after the update (it now has an events `delete` rule); if you don't, the
+  reset still works but the old feed lines linger.
