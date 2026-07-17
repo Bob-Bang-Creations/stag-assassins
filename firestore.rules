@@ -22,7 +22,7 @@ service cloud.firestore {
       // KEEP IN SYNC with JOIN_CODE in src/gameConfig.js. Not a secret —
       // it's on the QR card — but it gates writes to people at the party.
       function codeOk(data) {
-        return data.joinCode == 'Stag26';
+        return data.joinCode == 'STAG26';
       }
 
       function signedIn() {

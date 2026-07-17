@@ -5,7 +5,7 @@ export const GAME_ID = 'stag-manchester-2026'
 // Shown on the QR card / group chat. Checked at join AND enforced by
 // firestore.rules — if you change it here, change codeOk() in
 // firestore.rules to match and republish the rules.
-export const JOIN_CODE = 'Stag26'
+export const JOIN_CODE = 'STAG26'
 
 // Players pick their name from this list at join — no typos, no duplicates.
 export const ROSTER = [
