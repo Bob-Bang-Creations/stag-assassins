@@ -19,7 +19,15 @@ import {
   writeBatch,
 } from 'firebase/firestore'
 import { db } from './firebase'
-import { GAME_ID, GM_NAME, JOIN_CODE, LOCATIONS, OBJECTS } from './gameConfig'
+import {
+  GAME_ID,
+  GM_NAME,
+  JOIN_CODE,
+  LOCATIONS,
+  OBJECTS,
+  STAG_EXCLUDED_LOCATIONS,
+  STAG_NAME,
+} from './gameConfig'
 
 export const gameRef = () => doc(db, 'games', GAME_ID)
 export const playerRef = (uid) => doc(db, 'games', GAME_ID, 'players', uid)
@@ -57,6 +65,18 @@ function deal(list, n) {
 
 function randomFrom(list) {
   return list[Math.floor(Math.random() * list.length)]
+}
+
+// Locations valid for a given player: the stag never gets the two that only
+// make sense for hunting HIM (he can't be away from the group, or by himself).
+function locationsFor(name) {
+  return name === STAG_NAME
+    ? LOCATIONS.filter((l) => !STAG_EXCLUDED_LOCATIONS.includes(l))
+    : LOCATIONS
+}
+
+function randomLocationFor(name) {
+  return randomFrom(locationsFor(name))
 }
 
 // Join: claim a roster name and create the player doc. Runs in a transaction
@@ -335,7 +355,7 @@ export async function gmRerollMission({ playerUid, playerName }) {
       missionRef(playerUid),
       {
         object: randomFrom(OBJECTS),
-        location: randomFrom(LOCATIONS),
+        location: randomLocationFor(playerName),
         assignedAt: serverTimestamp(),
       },
       { merge: true },
@@ -475,13 +495,22 @@ export async function startGame({ players }) {
       )
     }
     const ring = shuffled(players.map((p) => p.id))
+    const nameById = new Map(players.map((p) => [p.id, p.name]))
     const objects = deal(OBJECTS, ring.length)
     const locations = deal(LOCATIONS, ring.length)
     ring.forEach((uid, i) => {
+      let location = locations[i]
+      // The stag never gets a location that only makes sense for hunting him.
+      if (
+        nameById.get(uid) === STAG_NAME &&
+        STAG_EXCLUDED_LOCATIONS.includes(location)
+      ) {
+        location = randomLocationFor(STAG_NAME)
+      }
       tx.set(missionRef(uid), {
         targetId: ring[(i + 1) % ring.length],
         object: objects[i],
-        location: locations[i],
+        location,
         assignedAt: serverTimestamp(),
       })
     })
@@ -601,7 +630,7 @@ export async function confirmDeath({ victimUid }) {
       tx.set(missionRef(assassinUid), {
         targetId: inheritedTargetId,
         object: randomFrom(OBJECTS),
-        location: randomFrom(LOCATIONS),
+        location: randomLocationFor(assassin.name),
         assignedAt: serverTimestamp(),
       })
       outcome = 'died'
@@ -626,21 +655,24 @@ export async function disputeKill({ victimUid, victimName }) {
     if (!victim || victim.status !== 'alive' || !victim.pendingKillFrom) {
       return // nothing to dispute (already resolved)
     }
+    // Player docs are readable by anyone, so we can look up the assassin's
+    // NAME (to keep stag-only locations off him) — but NOT their mission doc
+    // (owner/GM read only). All reads before any write.
+    const assassinSnap = await tx.get(playerRef(victim.pendingKillFrom))
+    const assassinName = assassinSnap.data()?.name
     tx.update(playerRef(victimUid), {
       pendingKillFrom: null,
       pendingKillObject: null,
       pendingKillLocation: null,
       pendingKillAt: null,
     })
-    // No existence read first: the victim may WRITE the assassin's mission
-    // (kill-handshake rule) but may not READ it — a tx.get here is
-    // permission-denied and would brick the dispute button. The assassin
-    // necessarily had a mission to report from, so merge blindly.
+    // The assassin necessarily had a mission to report from, so merge fresh
+    // object/location blindly (the victim can't read the mission to check).
     tx.set(
       missionRef(victim.pendingKillFrom),
       {
         object: randomFrom(OBJECTS),
-        location: randomFrom(LOCATIONS),
+        location: randomLocationFor(assassinName),
         assignedAt: serverTimestamp(),
       },
       { merge: true },

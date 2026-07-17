@@ -36,7 +36,7 @@ function devPreview() {
   }))
   const fakeGame = {
     status: 'lobby',
-    joinCode: 'STAG18',
+    joinCode: 'Stag26',
     playerCount: 4,
     gmUid: 'fake-0',
     winnerId: 'fake-0',

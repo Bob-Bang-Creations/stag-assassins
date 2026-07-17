@@ -5,7 +5,7 @@ export const GAME_ID = 'stag-manchester-2026'
 // Shown on the QR card / group chat. Checked at join AND enforced by
 // firestore.rules — if you change it here, change codeOk() in
 // firestore.rules to match and republish the rules.
-export const JOIN_CODE = 'STAG18'
+export const JOIN_CODE = 'Stag26'
 
 // Players pick their name from this list at join — no typos, no duplicates.
 export const ROSTER = [
@@ -24,6 +24,15 @@ export const ROSTER = [
 
 // The roster name that gets the GM tools (Start button, GM panel).
 export const GM_NAME = 'Bob'
+
+// The stag. A couple of locations are meaningless for him — he can't be
+// "away from the group" or standing "by the stag" (himself) — so those are
+// never dealt to him (at start, on inheritance, on reroll, on dispute).
+export const STAG_NAME = 'Alex'
+export const STAG_EXCLUDED_LOCATIONS = [
+  'by the stag',
+  'while the stag is away from the group',
+]
 
 // Objects: pocketable, pub-safe, cheap. Assigned without replacement,
 // refilled when exhausted. Trim or add lines freely before Friday — no

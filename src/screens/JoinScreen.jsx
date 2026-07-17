@@ -80,7 +80,7 @@ export default function JoinScreen({ uid, game, players }) {
                 type="text"
                 autoCapitalize="characters"
                 autoComplete="off"
-                placeholder="From the card"
+                placeholder="Check WhatsApp"
                 value={code}
                 onChange={(e) => setCode(e.target.value.toUpperCase())}
               />
@@ -132,7 +132,7 @@ export default function JoinScreen({ uid, game, players }) {
           type="text"
           autoCapitalize="characters"
           autoComplete="off"
-          placeholder="From the card"
+          placeholder="Check WhatsApp"
           value={code}
           onChange={(e) => setCode(e.target.value.toUpperCase())}
         />
