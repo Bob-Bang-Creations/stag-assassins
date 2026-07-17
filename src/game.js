@@ -8,6 +8,7 @@
 import {
   addDoc,
   collection,
+  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -401,13 +402,18 @@ export async function gmResetGame() {
     console.warn('Feed not cleared (publish the events delete rule):', err)
   }
 
-  // Back to a fresh, empty lobby. gmUid and joinCode are left untouched.
-  await updateDoc(gameRef(), {
-    status: 'lobby',
-    winnerId: null,
-    playerCount: 0,
-    endsAt: null,
-  })
+  // Back to a fresh, empty lobby, and RELEASE the GM role: a reset means a
+  // new game, so whoever next joins as GM_NAME claims GM — it's no longer
+  // welded to whichever device first joined as Bob. Clearing gmUid needs the
+  // relaxed gmUnchanged() rule; if the rules haven't been re-published yet,
+  // fall back to a reset that keeps gmUid so the game isn't left half-wiped.
+  const base = { status: 'lobby', winnerId: null, playerCount: 0, endsAt: null }
+  try {
+    await updateDoc(gameRef(), { ...base, gmUid: deleteField() })
+  } catch (err) {
+    console.warn('GM role not released (re-publish firestore.rules):', err)
+    await updateDoc(gameRef(), base)
+  }
 }
 
 async function commitDeletes(refs) {

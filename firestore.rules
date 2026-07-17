@@ -50,17 +50,19 @@ service cloud.firestore {
       }
 
       // gmUid unlocks every mission doc, so: absent, or set to yourself,
-      // or already set and unchanged. Never reassigned, never CLEARED —
-      // once present it must stay present (deleting it and re-claiming was
-      // the bypass a review caught).
+      // or already set and unchanged. It can never be REASSIGNED to another
+      // uid (deleting-and-re-claiming was a seizure bypass a review caught),
+      // but the CURRENT GM may CLEAR it — that's how a full reset releases
+      // the GM role so a fresh game can re-assign it to whoever joins as Bob.
       function gmClaimOk() {
         return !('gmUid' in request.resource.data)
           || request.resource.data.gmUid == request.auth.uid;
       }
       function gmUnchanged() {
         return ('gmUid' in resource.data)
-          ? ('gmUid' in request.resource.data
-              && request.resource.data.gmUid == resource.data.gmUid)
+          ? (('gmUid' in request.resource.data
+                && request.resource.data.gmUid == resource.data.gmUid)
+              || (isGM() && !('gmUid' in request.resource.data)))
           : (!('gmUid' in request.resource.data)
               || request.resource.data.gmUid == request.auth.uid);
       }

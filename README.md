@@ -105,9 +105,12 @@ for it and drop it in the group chat on the Friday.
 - If your own assassin reports a kill on you, your phone shows the death
   confirm screen and the GM panel is unreachable behind it — resolve your
   own death (confirm or dispute) first, then adjudicate others'.
-- Your GM identity cannot be re-linked in-app. Keep that phone charged. If
-  it dies for good, the Firebase console is the break-glass path (edit
-  `gmUid` on the game doc).
+- The GM role sticks to whichever device first joins as the GM name, for
+  the whole game — it can't be re-linked or seized mid-game. To move it to a
+  different phone, **reset the game** (that releases the role), then have the
+  right phone join as the GM name. If the GM phone dies mid-game with no
+  reset possible, the Firebase console is the break-glass path (delete
+  `gmUid` on the game doc, then the correct phone joins as the GM name).
 - REMOVE gives no kill credit ("fled the city"); FORCE CONFIRM does. Pick
   by what actually happened.
 - **RESET THE GAME** (bottom of the lobby, the GM panel, and the game-over
