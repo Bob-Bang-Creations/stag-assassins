@@ -178,11 +178,6 @@ export default function JoinScreen({ uid, game, players }) {
           </p>
         )}
 
-        <p className="hint mono dim">
-          No password to remember. Your mission card stays sealed until you
-          press and hold it — let go and it hides again.
-        </p>
-
         {error && <p className="error mono">{error}</p>}
 
         <button type="button" className="primary-btn" disabled={!ready} onClick={handleJoin}>
